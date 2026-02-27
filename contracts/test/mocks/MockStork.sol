@@ -6,7 +6,11 @@ import {IStork} from "../../src/interfaces/IStork.sol";
 
 /// @title MockStork -- Mock Stork oracle for testing
 contract MockStork is IStork {
+    error MockStorkNotFound();
+    error MockStorkInvalidSignature();
+
     mapping(bytes32 => StorkStructs.TemporalNumericValue) private _values;
+    bool private _shouldRevertOnUpdate;
 
     /// @notice Set a mock price value for a feed
     /// @param id The feed ID (e.g., keccak256("ETHUSD"))
@@ -22,11 +26,17 @@ contract MockStork is IStork {
             StorkStructs.TemporalNumericValue({timestampNs: uint64(block.timestamp) * 1e9, quantizedValue: value});
     }
 
+    /// @notice Configure whether updateTemporalNumericValuesV1 should revert (simulates invalid signature)
+    function setShouldRevertOnUpdate(bool shouldRevert) external {
+        _shouldRevertOnUpdate = shouldRevert;
+    }
+
     function updateTemporalNumericValuesV1(StorkStructs.TemporalNumericValueInput[] calldata)
         external
         payable
         override
     {
+        if (_shouldRevertOnUpdate) revert MockStorkInvalidSignature();
         // No-op in mock -- prices are set directly via setPrice
     }
 
@@ -37,7 +47,7 @@ contract MockStork is IStork {
         returns (StorkStructs.TemporalNumericValue memory)
     {
         StorkStructs.TemporalNumericValue memory val = _values[id];
-        require(val.timestampNs != 0, "MockStork: not found");
+        if (val.timestampNs == 0) revert MockStorkNotFound();
         return val;
     }
 

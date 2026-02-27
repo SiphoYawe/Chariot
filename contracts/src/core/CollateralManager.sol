@@ -28,8 +28,12 @@ contract CollateralManager is ChariotBase, ICollateralManager {
 
     // -- State --
     mapping(address => mapping(address => uint256)) private _userCollateral;
+    mapping(address => bytes32) private _priceFeedIds;
     ILendingPool private _lendingPool;
     address private immutable _bridgedETH;
+
+    // -- Events --
+    event PriceFeedIdSet(address indexed token, bytes32 feedId);
 
     // -- Constructor --
     constructor(address bridgedETH_, address storkOracle_, address admin_) {
@@ -39,6 +43,9 @@ contract CollateralManager is ChariotBase, ICollateralManager {
         storkOracle = storkOracle_;
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin_);
+
+        // Initialize BridgedETH price feed ID
+        _priceFeedIds[bridgedETH_] = ETHUSD_FEED_ID;
     }
 
     // -- External Functions --
@@ -207,15 +214,36 @@ contract CollateralManager is ChariotBase, ICollateralManager {
         _lendingPool = ILendingPool(lendingPool_);
     }
 
+    /// @notice Set the Stork price feed ID for a collateral token
+    /// @param token The collateral token address
+    /// @param feedId The Stork feed ID for the token's price
+    function setPriceFeedId(address token, bytes32 feedId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (token == address(0)) revert ZeroAddress();
+        if (feedId == bytes32(0)) revert OracleFeedNotConfigured();
+        _priceFeedIds[token] = feedId;
+        emit PriceFeedIdSet(token, feedId);
+    }
+
+    /// @notice Get the price feed ID for a collateral token
+    function getPriceFeedId(address token) external view returns (bytes32) {
+        return _priceFeedIds[token];
+    }
+
     // -- Internal Functions --
 
-    /// @dev Read ETH/USD price from Stork oracle
+    /// @dev Read ETH/USD price from Stork oracle using configured feed ID
+    /// @notice Uses _priceFeedIds mapping with fallback to ETHUSD_FEED_ID constant.
+    ///         Returns 0 on stale data (> STALENESS_THRESHOLD seconds old) -- callers must handle.
     function _getETHPrice() internal view returns (uint256) {
         if (storkOracle == address(0)) return 0;
 
-        StorkStructs.TemporalNumericValue memory value = IStork(storkOracle).getTemporalNumericValueV1(ETHUSD_FEED_ID);
+        bytes32 feedId = _priceFeedIds[_bridgedETH];
+        if (feedId == bytes32(0)) feedId = ETHUSD_FEED_ID;
 
-        // Staleness check
+        StorkStructs.TemporalNumericValue memory value = IStork(storkOracle).getTemporalNumericValueV1(feedId);
+
+        // Staleness check: data older than STALENESS_THRESHOLD (3600s) is rejected.
+        // Boundary: exactly STALENESS_THRESHOLD seconds old is still valid (> not >=).
         uint256 priceTimestamp = uint256(value.timestampNs) / 1e9;
         if (block.timestamp - priceTimestamp > STALENESS_THRESHOLD) {
             return 0; // Stale price -- return 0 to prevent operations
