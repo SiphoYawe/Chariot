@@ -10,7 +10,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white">
       {/* Simple header with logo */}
       <header className="flex items-center justify-between max-w-[1200px] mx-auto px-8 py-6">
-        <Image src="/chariot-light.svg" alt="Chariot" width={140} height={32} priority />
+        <Image src="/chariot-dark.svg" alt="Chariot" width={140} height={32} priority />
         <Link href="/dashboard" className="text-sm font-medium text-[#037971] hover:text-[#03B5AA] transition-colors">
           Launch App
         </Link>
