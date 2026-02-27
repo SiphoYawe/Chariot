@@ -18,15 +18,21 @@ contract ChariotVault is ChariotBase, ERC4626 {
     IERC20 public immutable USYC;
     IUSYCTeller public immutable TELLER;
 
+    // -- Constants --
+    uint256 public constant BUFFER_PERCENT = 0.05e18; // 5% liquid buffer
+    uint256 public constant REBALANCE_THRESHOLD = 100e6; // 100 USDC minimum to trigger
+
     // -- State --
     uint256 private _totalLent;
 
     // -- Events --
     event USDCLent(address indexed pool, uint256 amount);
     event USDCRepaid(address indexed pool, uint256 amount);
+    event Rebalanced(uint256 usdcDeposited, uint256 usdcRedeemed, uint256 usycBalance);
 
     // -- Custom Errors --
     error ExceedsAvailable(uint256 requested, uint256 available);
+    error USYCNotConfigured();
 
     // -- Constructor --
 
@@ -95,6 +101,43 @@ contract ChariotVault is ChariotBase, ERC4626 {
         _totalLent -= amount;
 
         emit USDCRepaid(msg.sender, amount);
+    }
+
+    // -- USYC Strategy --
+
+    /// @notice Rebalance idle USDC into USYC or redeem USYC for liquidity
+    /// @dev Maintains 5% liquid USDC buffer. Callable by OPERATOR_ROLE (agent) or admin.
+    function rebalance() external onlyRole(OPERATOR_ROLE) nonReentrant whenNotPaused {
+        if (address(USYC) == address(0) || address(TELLER) == address(0)) revert USYCNotConfigured();
+
+        uint256 total = totalAssets();
+        if (total == 0) return;
+
+        uint256 targetBuffer = (total * BUFFER_PERCENT) / 1e18;
+        uint256 currentIdle = IERC20(asset()).balanceOf(address(this));
+
+        if (currentIdle > targetBuffer + REBALANCE_THRESHOLD) {
+            // Excess idle USDC -- deposit to USYC Teller
+            uint256 excess = currentIdle - targetBuffer;
+            IERC20(asset()).forceApprove(address(TELLER), excess);
+            TELLER.deposit(excess);
+
+            emit Rebalanced(excess, 0, USYC.balanceOf(address(this)));
+        } else if (currentIdle < targetBuffer) {
+            // Shortfall -- redeem USYC from Teller to cover liquidity gap
+            uint256 shortfall = targetBuffer - currentIdle;
+            uint256 usycBalance = USYC.balanceOf(address(this));
+            if (usycBalance == 0) return;
+
+            // Calculate USYC needed to cover shortfall
+            uint256 usycToRedeem = TELLER.previewDeposit(shortfall);
+            if (usycToRedeem > usycBalance) usycToRedeem = usycBalance;
+
+            USYC.forceApprove(address(TELLER), usycToRedeem);
+            uint256 usdcReceived = TELLER.redeem(usycToRedeem);
+
+            emit Rebalanced(0, usdcReceived, USYC.balanceOf(address(this)));
+        }
     }
 
     // -- Internal Helpers --

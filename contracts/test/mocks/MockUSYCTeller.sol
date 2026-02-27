@@ -34,7 +34,7 @@ contract MockUSYCTeller is IUSYCTeller {
 
     function redeem(uint256 usycAmount) external override returns (uint256 usdcReceived) {
         usdcReceived = previewRedeem(usycAmount);
-        usyc.burn(msg.sender, usycAmount);
+        usyc.transferFrom(msg.sender, address(this), usycAmount);
         usdc.transfer(msg.sender, usdcReceived);
     }
 
