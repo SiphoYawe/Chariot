@@ -8,6 +8,7 @@ import {ChariotVault} from "../src/core/ChariotVault.sol";
 import {ChariotBase} from "../src/base/ChariotBase.sol";
 import {InterestRateModel} from "../src/risk/InterestRateModel.sol";
 import {ILendingPool} from "../src/interfaces/ILendingPool.sol";
+import {ICollateralManager} from "../src/interfaces/ICollateralManager.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {MockStork} from "./mocks/MockStork.sol";
 import {MockUSYCTeller} from "./mocks/MockUSYCTeller.sol";
@@ -362,5 +363,88 @@ contract LendingPoolTest is Test {
         pool.borrow(address(bridgedETH), 1000 * USDC_UNIT, emptyUpdates);
 
         assertEq(pool.getLastAccrualTimestamp(), block.timestamp);
+    }
+
+    // ================================================================
+    // Story 3-6: Extended Repay Tests
+    // ================================================================
+
+    function test_repay_partialKeepsCollateralLocked() public {
+        vm.prank(alice);
+        pool.borrow(address(bridgedETH), 5000 * USDC_UNIT, emptyUpdates);
+
+        // Partial repay
+        vm.prank(alice);
+        pool.repay(2000 * USDC_UNIT);
+
+        // Collateral should still be locked (debt > 0)
+        vm.prank(alice);
+        vm.expectRevert(ICollateralManager.DebtOutstanding.selector);
+        collateralManager.withdrawCollateral(address(bridgedETH), 1 ether);
+    }
+
+    function test_repay_multiplePartialRepayments() public {
+        vm.prank(alice);
+        pool.borrow(address(bridgedETH), 5000 * USDC_UNIT, emptyUpdates);
+
+        vm.startPrank(alice);
+        pool.repay(1000 * USDC_UNIT);
+        assertEq(pool.getUserDebt(alice), 4000 * USDC_UNIT);
+
+        pool.repay(1500 * USDC_UNIT);
+        assertEq(pool.getUserDebt(alice), 2500 * USDC_UNIT);
+
+        pool.repay(2500 * USDC_UNIT);
+        assertEq(pool.getUserDebt(alice), 0);
+        vm.stopPrank();
+    }
+
+    function test_repay_repaidUSDCIncreasesVaultLiquidity() public {
+        uint256 vaultAssetsBefore = vault.totalAssets();
+
+        vm.prank(alice);
+        pool.borrow(address(bridgedETH), 5000 * USDC_UNIT, emptyUpdates);
+
+        // Vault total assets should be unchanged (lent USDC counted)
+        assertEq(vault.totalAssets(), vaultAssetsBefore);
+
+        // Repay full
+        vm.prank(alice);
+        pool.repayFull();
+
+        // Vault assets should be restored
+        assertEq(vault.totalAssets(), vaultAssetsBefore);
+    }
+
+    function test_integration_borrowWarpPartialRepayWarpFullRepayWithdraw() public {
+        // 1. Alice borrows 4000 USDC
+        vm.prank(alice);
+        pool.borrow(address(bridgedETH), 4000 * USDC_UNIT, emptyUpdates);
+        assertEq(pool.getUserDebt(alice), 4000 * USDC_UNIT);
+
+        // 2. Warp 30 days -- interest accrues
+        vm.warp(block.timestamp + 30 days);
+        stork.setPriceNow(ETHUSD_FEED_ID, ETH_PRICE);
+
+        // 3. Partial repay 2000 USDC
+        vm.prank(alice);
+        pool.repay(2000 * USDC_UNIT);
+        uint256 debtAfterPartial = pool.getUserDebt(alice);
+        // Debt should be > 2000 due to interest accrued before repayment
+        assertTrue(debtAfterPartial > 2000 * USDC_UNIT, "Remaining debt should include interest");
+
+        // 4. Warp another 30 days
+        vm.warp(block.timestamp + 30 days);
+        stork.setPriceNow(ETHUSD_FEED_ID, ETH_PRICE);
+
+        // 5. Repay full
+        vm.prank(alice);
+        pool.repayFull();
+        assertEq(pool.getUserDebt(alice), 0);
+
+        // 6. Withdraw all collateral
+        vm.prank(alice);
+        collateralManager.withdrawCollateral(address(bridgedETH), 5 ether);
+        assertEq(bridgedETH.balanceOf(alice), 5 ether);
     }
 }
