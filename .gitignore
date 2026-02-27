@@ -1,0 +1,22 @@
+# OS files
+.DS_Store
+
+# IDE / Editor
+.obsidian/
+
+# BMAD folders
+_bmad/
+_bmad-output/
+
+# Documentation folders
+arc-docs/
+circle-docs/
+stork-oracle-docs/
+docs/
+
+# All markdown files except README
+*.md
+!README.md
+
+# Claude config
+.claude/
