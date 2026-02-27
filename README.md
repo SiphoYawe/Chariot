@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./chariot-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="./chariot-light.svg">
-    <img alt="Chariot" src="./chariot-light.svg" width="400">
+    <source media="(prefers-color-scheme: dark)" srcset="./chariot-light.svg">
+    <source media="(prefers-color-scheme: light)" srcset="./chariot-dark.svg">
+    <img alt="Chariot" src="./chariot-dark.svg" width="400">
   </picture>
 </p>
 
