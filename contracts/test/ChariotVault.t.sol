@@ -404,7 +404,7 @@ contract ChariotVaultTest is Test {
         vault.repay(0);
     }
 
-    function test_repay_revertsWhenExceedsTotalLent() public {
+    function test_repay_acceptsInterestExceedingTotalLent() public {
         vm.startPrank(alice);
         usdc.approve(address(vault), 1000 * USDC_UNIT);
         vault.deposit(1000 * USDC_UNIT, alice);
@@ -413,13 +413,16 @@ contract ChariotVaultTest is Test {
         vm.prank(lendingPool);
         vault.lend(100 * USDC_UNIT);
 
+        // Repaying 200 when only 100 was lent -- the extra 100 is interest income
+        usdc.mint(lendingPool, 100 * USDC_UNIT);
         vm.startPrank(lendingPool);
         usdc.approve(address(vault), 200 * USDC_UNIT);
-        vm.expectRevert(
-            abi.encodeWithSelector(ChariotVault.ExceedsAvailable.selector, 200 * USDC_UNIT, 100 * USDC_UNIT)
-        );
         vault.repay(200 * USDC_UNIT);
         vm.stopPrank();
+
+        // totalLent should be 0 (fully repaid), and vault has extra interest income
+        assertEq(vault.totalLent(), 0);
+        assertEq(vault.totalAssets(), 1100 * USDC_UNIT); // 1000 original + 100 interest
     }
 
     function test_repay_emitsEvent() public {

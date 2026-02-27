@@ -89,13 +89,19 @@ contract ChariotVault is ChariotBase, ERC4626 {
     }
 
     /// @notice Receive USDC back from LendingPool on borrower repayment
-    /// @param amount USDC amount being repaid (6 decimals)
+    /// @param amount USDC amount being repaid (6 decimals). May exceed totalLent when interest is included.
     function repay(uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
-        if (amount > _totalLent) revert ExceedsAvailable(amount, _totalLent);
 
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
-        _totalLent -= amount;
+
+        // Reduce totalLent by at most the outstanding lent amount.
+        // Any excess (interest income) stays in the vault as idle USDC.
+        if (amount <= _totalLent) {
+            _totalLent -= amount;
+        } else {
+            _totalLent = 0;
+        }
 
         emit USDCRepaid(msg.sender, amount);
     }

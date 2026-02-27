@@ -19,7 +19,6 @@ interface ILendingPool {
     // -- Errors --
     error HealthFactorTooLow();
     error ExceedsLTV();
-    error ZeroAmount();
     error InsufficientLiquidity();
     error NoPosition();
     error NoDebt();
