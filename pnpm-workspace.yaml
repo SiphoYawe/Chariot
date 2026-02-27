@@ -1,0 +1,6 @@
+packages:
+  - "contracts"
+  - "frontend"
+  - "shared"
+  - "agent"
+  - "relayer"

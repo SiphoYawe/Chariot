@@ -1,8 +1,13 @@
 # OS files
 .DS_Store
+Thumbs.db
 
 # IDE / Editor
 .obsidian/
+.idea/
+.vscode/
+*.swp
+*.swo
 
 # BMAD folders
 _bmad/
@@ -20,3 +25,32 @@ docs/
 
 # Claude config
 .claude/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+.next/
+out/
+
+# Foundry
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Turbo
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+
+# Debug
+npm-debug.log*
+pnpm-debug.log*

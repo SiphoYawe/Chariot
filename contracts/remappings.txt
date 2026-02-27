@@ -1,0 +1,4 @@
+@openzeppelin/=lib/openzeppelin-contracts/
+solady/=lib/solady/src/
+forge-std/=lib/forge-std/src/
+@stork-oracle/=lib/stork-external/contracts/evm/src/

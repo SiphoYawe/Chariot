@@ -1,0 +1,11 @@
+{
+  "name": "@chariot/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "$HOME/.foundry/bin/forge build",
+    "test": "$HOME/.foundry/bin/forge test",
+    "clean": "$HOME/.foundry/bin/forge clean",
+    "lint": "$HOME/.foundry/bin/forge fmt --check"
+  }
+}
