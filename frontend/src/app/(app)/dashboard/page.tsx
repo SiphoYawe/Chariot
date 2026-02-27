@@ -6,6 +6,7 @@ import { BorrowRateDisplay } from "@/components/vault/BorrowRateDisplay";
 import { OracleDataDisplay } from "@/components/vault/OracleDataDisplay";
 import { RateTable } from "@/components/vault/RateTable";
 import { CircuitBreakerBanner } from "@/components/feedback/CircuitBreakerBanner";
+import { DashboardLenderPosition } from "@/components/collateral/DashboardLenderPosition";
 
 export default function DashboardPage() {
   return (
@@ -14,6 +15,11 @@ export default function DashboardPage() {
 
       {/* Circuit Breaker Banner -- only visible when level > 0 */}
       <CircuitBreakerBanner />
+
+      {/* Lender Position -- compact summary with link to Lend page */}
+      <section className="mb-8">
+        <DashboardLenderPosition />
+      </section>
 
       {/* Protocol Metrics */}
       <section className="mb-8">

@@ -16,7 +16,10 @@ import { ErrorState } from "@/components/feedback/ErrorState";
 import { useVaultMetrics } from "@/hooks/useVaultMetrics";
 import { useVaultDeposit } from "@/hooks/useVaultDeposit";
 import { useVaultWithdraw } from "@/hooks/useVaultWithdraw";
-import { Loading03Icon } from "@hugeicons/core-free-icons";
+import { PositionCard } from "@/components/collateral/PositionCard";
+import { EmptyState } from "@/components/feedback/EmptyState";
+import { useLenderPosition } from "@/hooks/useLenderPosition";
+import { Loading03Icon, CoinsSwapIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 // -- Mock user balances (replaced by wagmi useReadContract when deployed) --
@@ -428,6 +431,58 @@ function WithdrawPanel() {
 }
 
 // ============================================================
+// Lender Position Section
+// ============================================================
+
+function LenderPositionSection() {
+  const { data, isLoading, hasPosition } = useLenderPosition();
+
+  if (isLoading) {
+    return (
+      <PositionCard
+        shareBalance={0}
+        sharePrice={0}
+        positionValue={0}
+        originalDeposit={0}
+        accruedEarnings={0}
+        personalAPY={0}
+        loading
+      />
+    );
+  }
+
+  if (!hasPosition || !data) {
+    return (
+      <EmptyState
+        icon={CoinsSwapIcon}
+        headline="Start Earning"
+        description="Deposit USDC to earn dual yield from T-Bill-backed USYC tokens and borrower interest. Your deposits are represented as chUSDC shares that appreciate over time."
+        action={{
+          label: "Deposit USDC",
+          onClick: () => {
+            const depositTab = document.querySelector(
+              '[data-slot="tabs-trigger"][value="deposit"]'
+            ) as HTMLElement;
+            depositTab?.click();
+          },
+        }}
+      />
+    );
+  }
+
+  return (
+    <PositionCard
+      shareBalance={data.shareBalance}
+      sharePrice={data.sharePrice}
+      positionValue={data.positionValue}
+      originalDeposit={data.originalDeposit}
+      accruedEarnings={data.accruedEarnings}
+      personalAPY={data.personalAPY}
+    />
+  );
+}
+
+// ============================================================
 // Lend Page
 // ============================================================
 
@@ -439,6 +494,11 @@ export default function LendPage() {
       {/* Vault stats summary */}
       <section className="mb-8">
         <VaultStats />
+      </section>
+
+      {/* Lender position or empty state */}
+      <section className="mb-8 max-w-[520px]">
+        <LenderPositionSection />
       </section>
 
       {/* Deposit / Withdraw tabs */}
