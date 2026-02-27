@@ -31,9 +31,12 @@ interface ILendingPool {
     ) external;
     function repay(uint256 amount) external;
     function repayFull() external;
+    function accrueInterest() external;
+    function liquidateRepay(address borrower, uint256 amount) external;
     function getUserDebt(address user) external view returns (uint256);
     function getUserPosition(address user) external view returns (BorrowerPosition memory);
     function getTotalBorrowed() external view returns (uint256);
     function getTotalReserves() external view returns (uint256);
     function getLastAccrualTimestamp() external view returns (uint256);
+    function getGlobalInterestIndex() external view returns (uint256);
 }

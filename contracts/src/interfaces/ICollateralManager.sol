@@ -8,6 +8,9 @@ interface ICollateralManager {
     // -- Events --
     event CollateralDeposited(address indexed user, address indexed token, uint256 amount);
     event CollateralWithdrawn(address indexed user, address indexed token, uint256 amount);
+    event CollateralSeized(
+        address indexed borrower, address indexed liquidator, address indexed token, uint256 amount
+    );
 
     // -- Errors --
     error DebtOutstanding();
@@ -21,9 +24,12 @@ interface ICollateralManager {
     function getCollateralValue(address user, StorkStructs.TemporalNumericValueInput[] calldata priceUpdates)
         external
         returns (uint256);
+    function getCollateralValueView(address user) external view returns (uint256);
     function getHealthFactor(address user, StorkStructs.TemporalNumericValueInput[] calldata priceUpdates)
         external
         returns (uint256);
     function getEffectiveLTV() external view returns (uint256);
     function getLiquidationThreshold() external view returns (uint256);
+    function getETHPrice() external view returns (uint256);
+    function seizeCollateral(address borrower, address token, uint256 amount, address recipient) external;
 }

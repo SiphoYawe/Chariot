@@ -175,6 +175,43 @@ contract LendingPool is ChariotBase, ILendingPool {
         emit Repaid(msg.sender, currentDebt, 0);
     }
 
+    /// @notice Trigger interest accrual externally (used by LiquidationEngine)
+    function accrueInterest() external {
+        _accrueInterest();
+    }
+
+    /// @notice Reduce a borrower's debt during liquidation -- USDC already sent to vault
+    /// @param borrower The borrower whose debt is being reduced
+    /// @param amount Amount of debt to reduce (USDC 6 decimals)
+    function liquidateRepay(address borrower, uint256 amount)
+        external
+        onlyRole(LIQUIDATION_ENGINE_ROLE)
+        nonReentrant
+        accruesInterest
+    {
+        if (amount == 0) revert ZeroAmount();
+
+        uint256 currentDebt = _getUserDebtInternal(borrower);
+        if (currentDebt == 0) revert NoDebt();
+
+        // Cap at actual debt
+        uint256 repayAmount = amount > currentDebt ? currentDebt : amount;
+
+        // Update borrower position
+        if (repayAmount == currentDebt) {
+            _positions[borrower].principal = 0;
+            _positions[borrower].interestIndex = 0;
+        } else {
+            _positions[borrower].principal = currentDebt - repayAmount;
+            _positions[borrower].interestIndex = _globalInterestIndex;
+        }
+
+        // Update total borrowed
+        _totalBorrowed = _totalBorrowed >= repayAmount ? _totalBorrowed - repayAmount : 0;
+
+        emit Repaid(borrower, repayAmount, _getUserDebtInternal(borrower));
+    }
+
     // -- View Functions --
 
     /// @notice Get a user's current debt including accrued interest

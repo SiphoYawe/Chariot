@@ -154,6 +154,51 @@ contract CollateralManager is ChariotBase, ICollateralManager {
         return _bridgedETH;
     }
 
+    /// @notice Get the USD value of a user's collateral using stored oracle price (view-only)
+    /// @param user The borrower address
+    /// @return Collateral value in USDC terms (6 decimals)
+    function getCollateralValueView(address user) external view returns (uint256) {
+        uint256 collateralAmount = _userCollateral[user][_bridgedETH];
+        if (collateralAmount == 0) return 0;
+
+        uint256 ethPrice = _getETHPrice();
+        if (ethPrice == 0) return 0;
+
+        uint256 valueWad = ChariotMath.wadMul(collateralAmount, ethPrice);
+        return ChariotMath.wadToUsdc(valueWad);
+    }
+
+    /// @notice Get the current stored ETH/USD price from oracle
+    /// @return ETH price in WAD (18 decimals)
+    function getETHPrice() external view returns (uint256) {
+        return _getETHPrice();
+    }
+
+    /// @notice Seize collateral from a borrower during liquidation
+    /// @param borrower The borrower whose collateral is seized
+    /// @param token The collateral token address
+    /// @param amount Amount of collateral to seize (18 decimals for BridgedETH)
+    /// @param recipient The liquidator receiving the seized collateral
+    function seizeCollateral(address borrower, address token, uint256 amount, address recipient)
+        external
+        onlyRole(LIQUIDATION_ENGINE_ROLE)
+        nonReentrant
+    {
+        if (token != _bridgedETH) revert InvalidToken();
+        if (amount == 0) revert ZeroAmount();
+
+        uint256 balance = _userCollateral[borrower][token];
+        if (amount > balance) revert InsufficientCollateral();
+
+        // Effects
+        _userCollateral[borrower][token] = balance - amount;
+
+        // Interactions
+        IERC20(token).safeTransfer(recipient, amount);
+
+        emit CollateralSeized(borrower, recipient, token, amount);
+    }
+
     // -- Admin Functions --
 
     /// @notice Set the LendingPool reference for debt checks

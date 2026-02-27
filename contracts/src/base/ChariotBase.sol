@@ -10,6 +10,7 @@ abstract contract ChariotBase is AccessControl, ReentrancyGuard {
     // -- Roles --
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant LENDING_POOL_ROLE = keccak256("LENDING_POOL_ROLE");
+    bytes32 public constant LIQUIDATION_ENGINE_ROLE = keccak256("LIQUIDATION_ENGINE_ROLE");
 
     // -- State --
     address public storkOracle;
