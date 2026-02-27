@@ -4,6 +4,7 @@ import { ProtocolHealthGrid } from "@/components/data/ProtocolHealthGrid";
 import { YieldDisplay } from "@/components/vault/YieldDisplay";
 import { BorrowRateDisplay } from "@/components/vault/BorrowRateDisplay";
 import { OracleDataDisplay } from "@/components/vault/OracleDataDisplay";
+import { RateTable } from "@/components/vault/RateTable";
 import { CircuitBreakerBanner } from "@/components/feedback/CircuitBreakerBanner";
 
 export default function DashboardPage() {
@@ -42,6 +43,14 @@ export default function DashboardPage() {
           Protocol Health
         </h2>
         <ProtocolHealthGrid />
+      </section>
+
+      {/* Rate Table */}
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-[#023436] mb-4">
+          Rate Schedule
+        </h2>
+        <RateTable />
       </section>
     </div>
   );

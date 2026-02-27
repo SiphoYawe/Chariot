@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import { useAccount, useChainId } from "wagmi";
 import {
   Home03Icon,
   MoneyBag02Icon,
@@ -11,6 +12,7 @@ import {
   Clock04Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { arcTestnet } from "@/lib/chains";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home03Icon },
@@ -54,11 +56,37 @@ export function AppSidebar() {
         </ul>
       </nav>
 
-      {/* Footer */}
-      <div className="px-6 py-4 border-t border-white/10">
-        <p className="text-xs text-white/40">Chariot Protocol</p>
-        <p className="text-xs text-white/30">Arc Testnet</p>
-      </div>
+      {/* Footer -- Wallet Status */}
+      <WalletStatus />
     </aside>
+  );
+}
+
+function WalletStatus() {
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const isCorrectNetwork = chainId === arcTestnet.id;
+
+  return (
+    <div className="px-6 py-4 border-t border-white/10">
+      {isConnected && address ? (
+        <>
+          <p className="text-xs text-white/70 font-mono truncate">
+            {address.slice(0, 6)}...{address.slice(-4)}
+          </p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className={`w-1.5 h-1.5 ${isCorrectNetwork ? "bg-[#10B981]" : "bg-[#F59E0B]"}`} />
+            <p className="text-xs text-white/40">
+              {isCorrectNetwork ? "Arc Testnet" : "Wrong Network"}
+            </p>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-xs text-white/40">Chariot Protocol</p>
+          <p className="text-xs text-white/30">Arc Testnet</p>
+        </>
+      )}
+    </div>
   );
 }
