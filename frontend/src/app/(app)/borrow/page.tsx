@@ -7,11 +7,17 @@ import { EmptyState } from "@/components/feedback/EmptyState";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { CollateralDepositFlow } from "@/components/bridge/CollateralDepositFlow";
 import { CollateralTable, buildCollateralRows } from "@/components/collateral/CollateralTable";
+import { BorrowerPositionCard } from "@/components/collateral/BorrowerPositionCard";
+import { BorrowPanel } from "@/components/borrow/BorrowPanel";
+import { RepayPanel } from "@/components/borrow/RepayPanel";
+import { BorrowRateDisplay } from "@/components/borrow/BorrowRateDisplay";
+import { ClosedPositionConfirmation } from "@/components/borrow/ClosedPositionConfirmation";
 import { HealthFactorGauge } from "@/components/risk/HealthFactorGauge";
 import { DataCard } from "@/components/data/DataCard";
 import { useCollateralData } from "@/hooks/useCollateralData";
 import { useETHUSDPrice } from "@/hooks/useETHUSDPrice";
-import { useHealthFactor } from "@/hooks/useHealthFactor";
+import { useUserPosition } from "@/hooks/useUserPosition";
+import { useBorrowRate } from "@/hooks/useBorrowRate";
 import { useAccount } from "wagmi";
 import { Wallet03Icon } from "@hugeicons/core-free-icons";
 import { RISK_PARAMS } from "@chariot/shared";
@@ -50,13 +56,16 @@ export default function BorrowPage() {
   const { address, isConnected } = useAccount();
   const collateral = useCollateralData(address);
   const ethPrice = useETHUSDPrice();
-  const healthFactor = useHealthFactor(address);
+  const position = useUserPosition(address, ethPrice.data?.price);
+  const borrowRate = useBorrowRate();
 
   // Track whether user is in deposit flow
   const [showDepositFlow, setShowDepositFlow] = useState(false);
+  // Track closed position state (after full repay + withdrawal)
+  const [closedPosition, setClosedPosition] = useState<{ collateralReturnedEth: number } | null>(null);
 
   // Loading state
-  const isLoading = collateral.isLoading || ethPrice.isLoading;
+  const isLoading = collateral.isLoading || ethPrice.isLoading || position.isLoading;
 
   // Error state
   if (collateral.isError || ethPrice.isError) {
@@ -77,7 +86,25 @@ export default function BorrowPage() {
   const hasCollateral = collateral.data?.hasCollateral ?? false;
   const price = ethPrice.data?.price ?? 0;
   const collateralValue = collateral.data?.collateralValueUsdc ?? 0;
+  // Convert bigint (wei) to number (ETH)
+  const collateralEth = collateral.data?.collateralBalance
+    ? Number(collateral.data.collateralBalance) / 1e18
+    : 0;
   const maxBorrow = collateralValue * RISK_PARAMS.BRIDGED_ETH.BASE_LTV;
+
+  // Position data
+  const hasDebt = position.data?.isActive && (position.data?.outstandingDebt ?? 0) > 0;
+  const outstandingDebt = position.data?.outstandingDebt ?? 0;
+  const principal = position.data?.principal ?? 0;
+  const interestAccrued = position.data?.interestAccrued ?? 0;
+  const effectiveLtv = position.data?.effectiveLtv ?? 0;
+  const healthFactor = position.data?.healthFactor ?? Infinity;
+  const liquidationPrice = position.data?.liquidationPrice ?? 0;
+  const maxAdditionalBorrow = position.data?.maxAdditionalBorrow ?? maxBorrow;
+
+  // Borrow rate
+  const currentBorrowRate = borrowRate.data?.borrowRate ?? 0;
+  const currentUtilisation = borrowRate.data?.utilisation ?? 0;
 
   const collateralRows = hasCollateral && collateral.data
     ? buildCollateralRows(
@@ -86,6 +113,12 @@ export default function BorrowPage() {
         price
       )
     : [];
+
+  const handleRefreshAll = () => {
+    collateral.refetch();
+    position.refetch();
+    borrowRate.refetch();
+  };
 
   return (
     <>
@@ -106,6 +139,17 @@ export default function BorrowPage() {
             },
           }}
         />
+      ) : closedPosition ? (
+        /* Position closed confirmation */
+        <div className="max-w-md mx-auto">
+          <ClosedPositionConfirmation
+            collateralReturnedEth={closedPosition.collateralReturnedEth}
+            onNewPosition={() => {
+              setClosedPosition(null);
+              setShowDepositFlow(true);
+            }}
+          />
+        </div>
       ) : !hasCollateral && !showDepositFlow ? (
         /* No collateral -- show empty state with CTA */
         <div className="space-y-6">
@@ -191,7 +235,7 @@ export default function BorrowPage() {
           </div>
         </div>
       ) : (
-        /* Has collateral -- show position overview */
+        /* Has collateral -- show position, borrow/repay panels */
         <div className="space-y-6">
           {/* Metrics grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -200,9 +244,9 @@ export default function BorrowPage() {
               value={`$${formatUsd(collateralValue)}`}
             />
             <DataCard
-              label="Available to Borrow"
-              value={`$${formatUsd(maxBorrow)}`}
-              subtitle={`${(RISK_PARAMS.BRIDGED_ETH.BASE_LTV * 100).toFixed(0)}% LTV`}
+              label={hasDebt ? "Outstanding Debt" : "Available to Borrow"}
+              value={hasDebt ? `$${formatUsd(outstandingDebt)}` : `$${formatUsd(maxBorrow)}`}
+              subtitle={hasDebt ? undefined : `${(RISK_PARAMS.BRIDGED_ETH.BASE_LTV * 100).toFixed(0)}% LTV`}
             />
             <DataCard
               label="ETH/USD"
@@ -211,8 +255,43 @@ export default function BorrowPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left: Collateral table + deposit button */}
+            {/* Left column: Action panels */}
             <div className="space-y-4">
+              {!hasDebt ? (
+                /* No debt -- show borrow panel */
+                <BorrowPanel
+                  collateralValueUsdc={collateralValue}
+                  currentDebt={outstandingDebt}
+                  borrowRate={currentBorrowRate}
+                  ethPrice={price}
+                  collateralAmountEth={collateralEth}
+                  onSuccess={handleRefreshAll}
+                />
+              ) : (
+                /* Has debt -- show repay panel */
+                <RepayPanel
+                  outstandingDebt={outstandingDebt}
+                  principal={principal}
+                  interestAccrued={interestAccrued}
+                  hasDebt={!!hasDebt}
+                  collateralAmountEth={collateralEth}
+                  onSuccess={() => {
+                    handleRefreshAll();
+                    // If collateral was withdrawn (no debt + withdraw), show closed confirmation
+                    if (!hasDebt && collateralEth > 0) {
+                      setClosedPosition({ collateralReturnedEth: collateralEth });
+                    }
+                  }}
+                />
+              )}
+
+              {/* Borrow rate display */}
+              <BorrowRateDisplay
+                borrowRate={currentBorrowRate}
+                utilisation={currentUtilisation}
+              />
+
+              {/* Collateral table */}
               <CollateralTable
                 rows={collateralRows}
                 isLoading={collateral.isLoading}
@@ -227,11 +306,19 @@ export default function BorrowPage() {
               </Button>
             </div>
 
-            {/* Right: Health factor */}
-            <div className="space-y-4">
-              <HealthFactorGauge
-                healthFactor={healthFactor.data?.healthFactor ?? Infinity}
-                hasDebt={healthFactor.data?.hasDebt ?? false}
+            {/* Right column: Position overview */}
+            <div>
+              <BorrowerPositionCard
+                collateralAmountEth={collateralEth}
+                collateralValueUsdc={collateralValue}
+                outstandingDebt={outstandingDebt}
+                principal={principal}
+                interestAccrued={interestAccrued}
+                effectiveLtv={effectiveLtv}
+                healthFactor={healthFactor}
+                liquidationPrice={liquidationPrice}
+                maxAdditionalBorrow={maxAdditionalBorrow}
+                hasDebt={!!hasDebt}
               />
             </div>
           </div>
