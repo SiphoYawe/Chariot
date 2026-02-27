@@ -26,14 +26,39 @@ contract CollateralManager is ChariotBase, ICollateralManager {
     /// @dev Stork oracle feed ID for ETHUSD
     bytes32 public constant ETHUSD_FEED_ID = 0x59102b37de83bdda9f38ac8254e596f0d9ac61d2035c07936675e87342817160;
 
+    // -- Structs --
+    struct CollateralConfig {
+        uint256 baseLTV; // WAD (e.g., 75e16 = 75%)
+        uint256 liquidationThreshold; // WAD (e.g., 82e16 = 82%)
+        uint256 liquidationBonus; // WAD (e.g., 5e16 = 5%)
+        bytes32 priceFeedId; // Stork feed ID for price
+        bytes32 volatilityFeedId; // Stork feed ID for volatility (Phase 2)
+        bool isActive; // Whether this collateral type is enabled
+    }
+
     // -- State --
     mapping(address => mapping(address => uint256)) private _userCollateral;
     mapping(address => bytes32) private _priceFeedIds;
+    mapping(address => CollateralConfig) private _collateralConfigs;
+    address[] private _supportedCollateralTokens;
     ILendingPool private _lendingPool;
     address private immutable _bridgedETH;
 
     // -- Events --
     event PriceFeedIdSet(address indexed token, bytes32 feedId);
+    event CollateralTypeAdded(
+        address indexed token, uint256 baseLTV, uint256 liquidationThreshold, uint256 liquidationBonus
+    );
+    event CollateralConfigUpdated(
+        address indexed token, uint256 baseLTV, uint256 liquidationThreshold, uint256 liquidationBonus
+    );
+
+    // -- Errors --
+    error InvalidLTV();
+    error InvalidThreshold();
+    error InvalidBonus();
+    error AssetAlreadyExists();
+    error AssetNotFound();
 
     // -- Constructor --
     constructor(address bridgedETH_, address storkOracle_, address admin_) {
@@ -211,6 +236,7 @@ contract CollateralManager is ChariotBase, ICollateralManager {
     /// @notice Set the LendingPool reference for debt checks
     /// @param lendingPool_ The LendingPool contract address
     function setLendingPool(address lendingPool_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (lendingPool_ == address(0)) revert ZeroAddress();
         _lendingPool = ILendingPool(lendingPool_);
     }
 
@@ -229,7 +255,56 @@ contract CollateralManager is ChariotBase, ICollateralManager {
         return _priceFeedIds[token];
     }
 
+    /// @notice Add a new collateral type with full configuration
+    /// @param token The collateral token address
+    /// @param config The collateral configuration
+    function addCollateralType(address token, CollateralConfig calldata config) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (token == address(0)) revert ZeroAddress();
+        if (_collateralConfigs[token].isActive) revert AssetAlreadyExists();
+        _validateCollateralConfig(config);
+
+        _collateralConfigs[token] = config;
+        _supportedCollateralTokens.push(token);
+        _priceFeedIds[token] = config.priceFeedId;
+
+        emit CollateralTypeAdded(token, config.baseLTV, config.liquidationThreshold, config.liquidationBonus);
+    }
+
+    /// @notice Update configuration for an existing collateral type
+    /// @param token The collateral token address
+    /// @param config The new collateral configuration
+    function updateCollateralConfig(address token, CollateralConfig calldata config)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        if (!_collateralConfigs[token].isActive) revert AssetNotFound();
+        _validateCollateralConfig(config);
+
+        _collateralConfigs[token] = config;
+        _priceFeedIds[token] = config.priceFeedId;
+
+        emit CollateralConfigUpdated(token, config.baseLTV, config.liquidationThreshold, config.liquidationBonus);
+    }
+
+    /// @notice Get the collateral configuration for a token
+    function getCollateralConfig(address token) external view returns (CollateralConfig memory) {
+        return _collateralConfigs[token];
+    }
+
+    /// @notice Get all supported collateral token addresses
+    function getSupportedCollateralTokens() external view returns (address[] memory) {
+        return _supportedCollateralTokens;
+    }
+
     // -- Internal Functions --
+
+    /// @dev Validate collateral configuration parameters
+    function _validateCollateralConfig(CollateralConfig calldata config) internal pure {
+        if (config.baseLTV == 0 || config.baseLTV > 1e18) revert InvalidLTV();
+        if (config.liquidationThreshold <= config.baseLTV) revert InvalidThreshold();
+        if (config.liquidationBonus == 0 || config.liquidationBonus > 0.5e18) revert InvalidBonus();
+        if (config.priceFeedId == bytes32(0)) revert OracleFeedNotConfigured();
+    }
 
     /// @dev Read ETH/USD price from Stork oracle using configured feed ID
     /// @notice Uses _priceFeedIds mapping with fallback to ETHUSD_FEED_ID constant.

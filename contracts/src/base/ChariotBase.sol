@@ -17,6 +17,7 @@ abstract contract ChariotBase is AccessControl, ReentrancyGuard {
     // -- State --
     address public storkOracle;
     address public circuitBreaker;
+    uint8 public circuitBreakerLevel; // 0=normal, 1=pause borrows, 2=rate-limit, 3=emergency
 
     // -- Constants --
     uint256 public constant STALENESS_THRESHOLD = 3600;
@@ -28,23 +29,28 @@ abstract contract ChariotBase is AccessControl, ReentrancyGuard {
     error OracleDataStale();
     error ZeroPriceReturned();
     error OracleFeedNotConfigured();
+    error InvalidCircuitBreakerLevel();
+    error CircuitBreakerActive();
+    error BorrowingPaused();
 
     // -- Events --
     event OraclePriceUpdated(bytes32 indexed feedId, uint256 price, uint256 timestamp);
     event StorkOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event CircuitBreakerUpdated(address indexed oldBreaker, address indexed newBreaker);
+    event CircuitBreakerTriggered(uint8 level, address indexed triggeredBy);
+    event CircuitBreakerResumed(address indexed resumedBy);
 
     // -- Modifiers --
 
     /// @dev Reverts if the circuit breaker is at Level 3 (Emergency).
-    ///      Passes through when circuitBreaker is address(0) (not yet deployed).
     modifier whenNotPaused() {
+        if (circuitBreakerLevel >= 3) revert CircuitBreakerActive();
         _;
     }
 
     /// @dev Reverts if the circuit breaker is at Level 1+ (borrowing paused).
-    ///      Passes through when circuitBreaker is address(0) (not yet deployed).
     modifier whenBorrowingAllowed() {
+        if (circuitBreakerLevel >= 1) revert BorrowingPaused();
         _;
     }
 
@@ -61,6 +67,20 @@ abstract contract ChariotBase is AccessControl, ReentrancyGuard {
         address old = storkOracle;
         storkOracle = _storkOracle;
         emit StorkOracleUpdated(old, _storkOracle);
+    }
+
+    /// @notice Trigger circuit breaker to specified level (OPERATOR_ROLE)
+    /// @param level Circuit breaker level: 1=pause borrows, 2=rate-limit withdrawals, 3=emergency
+    function triggerCircuitBreaker(uint8 level) external onlyRole(OPERATOR_ROLE) {
+        if (level == 0 || level > 3) revert InvalidCircuitBreakerLevel();
+        circuitBreakerLevel = level;
+        emit CircuitBreakerTriggered(level, msg.sender);
+    }
+
+    /// @notice Resume normal protocol operation (ADMIN_ROLE only)
+    function resumeCircuitBreaker() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        circuitBreakerLevel = 0;
+        emit CircuitBreakerResumed(msg.sender);
     }
 
     // -- Oracle Helpers --
