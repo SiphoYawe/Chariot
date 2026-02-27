@@ -3,11 +3,10 @@ pragma solidity ^0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {ChariotVault} from "../src/core/ChariotVault.sol";
-import {ChariotBase} from "../src/base/ChariotBase.sol";
+
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {MockStork} from "./mocks/MockStork.sol";
 import {MockUSYCTeller} from "./mocks/MockUSYCTeller.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract ChariotVaultRebalanceTest is Test {
     ChariotVault public vault;

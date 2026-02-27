@@ -6,6 +6,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ChariotBase} from "../base/ChariotBase.sol";
+import {ChariotMath} from "../libraries/ChariotMath.sol";
 import {IUSYCTeller} from "../interfaces/IUSYCTeller.sol";
 
 /// @title ChariotVault -- ERC-4626 dual-yield lending vault
@@ -21,6 +22,8 @@ contract ChariotVault is ChariotBase, ERC4626 {
     // -- Constants --
     uint256 public constant BUFFER_PERCENT = 0.05e18; // 5% liquid buffer
     uint256 public constant REBALANCE_THRESHOLD = 100e6; // 100 USDC minimum to trigger
+    uint256 public constant RESERVE_FACTOR = 0.10e18; // 10% of borrow interest retained as protocol reserve
+    uint256 public constant STRATEGY_FEE = 0.05e18; // 5% fee on USYC yield
 
     // -- State --
     uint256 private _totalLent;
@@ -138,6 +141,34 @@ contract ChariotVault is ChariotBase, ERC4626 {
 
             emit Rebalanced(0, usdcReceived, USYC.balanceOf(address(this)));
         }
+    }
+
+    // -- Supply Rate --
+
+    /// @notice Calculate the supply rate (APY for lenders) from the dual-yield strategy
+    /// @dev supply_rate = (borrowRate * utilisation * (1 - reserveFactor)) + (usycYield * (1 - utilisation) * (1 - strategyFee))
+    /// @param borrowRate The current borrow rate (WAD, 18 decimals)
+    /// @param utilisation The current utilisation ratio (WAD, 18 decimals, 0 to 1e18)
+    /// @param usycYield The current USYC/T-bill yield rate (WAD, 18 decimals)
+    /// @return supplyRate The combined supply rate (WAD, 18 decimals)
+    function getSupplyRate(
+        uint256 borrowRate,
+        uint256 utilisation,
+        uint256 usycYield
+    ) external pure returns (uint256 supplyRate) {
+        // Borrow component: borrowRate * utilisation * (1 - reserveFactor)
+        uint256 borrowComponent = ChariotMath.wadMul(
+            ChariotMath.wadMul(borrowRate, utilisation),
+            1e18 - RESERVE_FACTOR
+        );
+
+        // USYC component: usycYield * (1 - utilisation) * (1 - strategyFee)
+        uint256 usycComponent = ChariotMath.wadMul(
+            ChariotMath.wadMul(usycYield, 1e18 - utilisation),
+            1e18 - STRATEGY_FEE
+        );
+
+        supplyRate = borrowComponent + usycComponent;
     }
 
     // -- Internal Helpers --
