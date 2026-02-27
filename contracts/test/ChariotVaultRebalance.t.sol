@@ -28,13 +28,7 @@ contract ChariotVaultRebalanceTest is Test {
         stork = new MockStork();
         teller = new MockUSYCTeller(address(usdc), address(usyc), INITIAL_USYC_PRICE);
 
-        vault = new ChariotVault(
-            address(usdc),
-            address(usyc),
-            address(teller),
-            address(stork),
-            admin
-        );
+        vault = new ChariotVault(address(usdc), address(usyc), address(teller), address(stork), admin);
 
         // Grant operator role
         bytes32 operatorRole = vault.OPERATOR_ROLE();
@@ -158,9 +152,7 @@ contract ChariotVaultRebalanceTest is Test {
         // Need excess < 100: totalAssets * 0.95 < 100 -> totalAssets < 105.26
         // So deposit 105 USDC: buffer = 5.25, excess = 99.75 < 100 threshold
 
-        ChariotVault vault2 = new ChariotVault(
-            address(usdc), address(usyc), address(teller), address(stork), admin
-        );
+        ChariotVault vault2 = new ChariotVault(address(usdc), address(usyc), address(teller), address(stork), admin);
         bytes32 opRole = vault2.OPERATOR_ROLE();
         vm.prank(admin);
         vault2.grantRole(opRole, operator);
@@ -221,9 +213,7 @@ contract ChariotVaultRebalanceTest is Test {
 
     function test_rebalance_revertsWhenUSYCNotConfigured() public {
         // Deploy vault without USYC
-        ChariotVault noUsycVault = new ChariotVault(
-            address(usdc), address(0), address(0), address(stork), admin
-        );
+        ChariotVault noUsycVault = new ChariotVault(address(usdc), address(0), address(0), address(stork), admin);
         bytes32 opRole = noUsycVault.OPERATOR_ROLE();
         vm.prank(admin);
         noUsycVault.grantRole(opRole, operator);

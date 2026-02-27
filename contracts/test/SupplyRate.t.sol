@@ -16,9 +16,7 @@ contract SupplyRateTest is Test {
         MockStork stork = new MockStork();
         MockUSYCTeller teller = new MockUSYCTeller(address(usdc), address(usyc), 1e18);
 
-        vault = new ChariotVault(
-            address(usdc), address(usyc), address(teller), address(stork), address(this)
-        );
+        vault = new ChariotVault(address(usdc), address(usyc), address(teller), address(stork), address(this));
     }
 
     // ================================================================
@@ -32,7 +30,7 @@ contract SupplyRateTest is Test {
         // borrowComponent = 0.08 * 0.20 * 0.90 = 0.0144 (1.44%)
         // usycComponent = 0.045 * 0.80 * 0.95 = 0.0342 (3.42%)
         // total = 0.0486 (4.86%)
-        uint256 rate = vault.getSupplyRate(0.08e18, 0.20e18, 0.045e18);
+        uint256 rate = vault.getSupplyRate(0.08e18, 0.2e18, 0.045e18);
         assertApproxEqAbs(rate, 0.0486e18, 1e14); // Within 0.01% precision
     }
 
@@ -42,7 +40,7 @@ contract SupplyRateTest is Test {
 
     function test_supplyRate_at20PercentUtilisation() public view {
         // At 20% utilisation with 8% borrow rate and 4.5% USYC yield
-        uint256 rate = vault.getSupplyRate(0.08e18, 0.20e18, 0.045e18);
+        uint256 rate = vault.getSupplyRate(0.08e18, 0.2e18, 0.045e18);
         // Expected: 1.44% + 3.42% = 4.86%
         // The spec says ~3.60% but that's with a different borrow rate assumption
         // Let's verify the math is correct
@@ -58,7 +56,7 @@ contract SupplyRateTest is Test {
         // borrowComponent = 0.04 * 0.80 * 0.90 = 0.0288 (2.88%)
         // usycComponent = 0.045 * 0.20 * 0.95 = 0.00855 (0.855%)
         // total = 0.03735 (3.735%)
-        uint256 rate = vault.getSupplyRate(0.04e18, 0.80e18, 0.045e18);
+        uint256 rate = vault.getSupplyRate(0.04e18, 0.8e18, 0.045e18);
         assertApproxEqAbs(rate, 0.03735e18, 1e14);
     }
 
@@ -91,7 +89,7 @@ contract SupplyRateTest is Test {
     // ================================================================
 
     function test_reserveFactor_isTenPercent() public view {
-        assertEq(vault.RESERVE_FACTOR(), 0.10e18);
+        assertEq(vault.RESERVE_FACTOR(), 0.1e18);
     }
 
     function test_strategyFee_isFivePercent() public view {
@@ -102,42 +100,35 @@ contract SupplyRateTest is Test {
     // Fuzz tests
     // ================================================================
 
-    function testFuzz_supplyRate_neverNegative(
-        uint256 borrowRate,
-        uint256 utilisation,
-        uint256 usycYield
-    ) public view {
+    function testFuzz_supplyRate_neverNegative(uint256 borrowRate, uint256 utilisation, uint256 usycYield) public view {
         borrowRate = bound(borrowRate, 0, 2e18); // 0-200%
         utilisation = bound(utilisation, 0, 1e18); // 0-100%
-        usycYield = bound(usycYield, 0, 0.20e18); // 0-20%
+        usycYield = bound(usycYield, 0, 0.2e18); // 0-20%
 
         uint256 rate = vault.getSupplyRate(borrowRate, utilisation, usycYield);
         // Supply rate should always be >= 0 (uint256 can't be negative, but verify no underflow)
         assertTrue(rate >= 0);
     }
 
-    function testFuzz_supplyRate_neverExceedsMax(
-        uint256 borrowRate,
-        uint256 utilisation,
-        uint256 usycYield
-    ) public view {
+    function testFuzz_supplyRate_neverExceedsMax(uint256 borrowRate, uint256 utilisation, uint256 usycYield)
+        public
+        view
+    {
         borrowRate = bound(borrowRate, 0, 2e18);
         utilisation = bound(utilisation, 0, 1e18);
-        usycYield = bound(usycYield, 0, 0.20e18);
+        usycYield = bound(usycYield, 0, 0.2e18);
 
         uint256 rate = vault.getSupplyRate(borrowRate, utilisation, usycYield);
         // Supply rate should never exceed borrowRate + usycYield (theoretical max)
         assertTrue(rate <= borrowRate + usycYield);
     }
 
-    function testFuzz_supplyRate_monotonic_utilisation(
-        uint256 borrowRate,
-        uint256 usycYield,
-        uint256 u1,
-        uint256 u2
-    ) public view {
-        borrowRate = bound(borrowRate, 0.01e18, 0.50e18);
-        usycYield = bound(usycYield, 0.01e18, 0.10e18);
+    function testFuzz_supplyRate_monotonic_utilisation(uint256 borrowRate, uint256 usycYield, uint256 u1, uint256 u2)
+        public
+        view
+    {
+        borrowRate = bound(borrowRate, 0.01e18, 0.5e18);
+        usycYield = bound(usycYield, 0.01e18, 0.1e18);
         u1 = bound(u1, 0, 0.99e18);
         u2 = bound(u2, u1, 1e18);
 

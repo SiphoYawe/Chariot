@@ -31,13 +31,7 @@ contract ChariotVaultTest is Test {
         stork = new MockStork();
         teller = new MockUSYCTeller(address(usdc), address(usyc), INITIAL_USYC_PRICE);
 
-        vault = new ChariotVault(
-            address(usdc),
-            address(usyc),
-            address(teller),
-            address(stork),
-            admin
-        );
+        vault = new ChariotVault(address(usdc), address(usyc), address(teller), address(stork), admin);
 
         // Grant lending pool role
         bytes32 lendingPoolRole = vault.LENDING_POOL_ROLE();
@@ -78,9 +72,7 @@ contract ChariotVaultTest is Test {
 
     function test_constructor_allowsZeroUsyc() public {
         // USYC and teller can be address(0) initially
-        ChariotVault v = new ChariotVault(
-            address(usdc), address(0), address(0), address(stork), admin
-        );
+        ChariotVault v = new ChariotVault(address(usdc), address(0), address(0), address(stork), admin);
         assertEq(address(v.USYC()), address(0));
     }
 
@@ -271,9 +263,7 @@ contract ChariotVaultTest is Test {
 
     function test_totalAssets_zeroWithNoUsyc() public {
         // Deploy vault with USYC = address(0)
-        ChariotVault noUsycVault = new ChariotVault(
-            address(usdc), address(0), address(0), address(stork), admin
-        );
+        ChariotVault noUsycVault = new ChariotVault(address(usdc), address(0), address(0), address(stork), admin);
 
         uint256 depositAmount = 100 * USDC_UNIT;
         vm.startPrank(alice);

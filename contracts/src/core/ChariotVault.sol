@@ -22,7 +22,7 @@ contract ChariotVault is ChariotBase, ERC4626 {
     // -- Constants --
     uint256 public constant BUFFER_PERCENT = 0.05e18; // 5% liquid buffer
     uint256 public constant REBALANCE_THRESHOLD = 100e6; // 100 USDC minimum to trigger
-    uint256 public constant RESERVE_FACTOR = 0.10e18; // 10% of borrow interest retained as protocol reserve
+    uint256 public constant RESERVE_FACTOR = 0.1e18; // 10% of borrow interest retained as protocol reserve
     uint256 public constant STRATEGY_FEE = 0.05e18; // 5% fee on USYC yield
 
     // -- State --
@@ -44,13 +44,7 @@ contract ChariotVault is ChariotBase, ERC4626 {
     /// @param _usycTeller USYC Teller contract (or address(0) if not yet configured)
     /// @param _storkOracle Stork oracle address
     /// @param _admin Initial admin address (receives DEFAULT_ADMIN_ROLE + OPERATOR_ROLE)
-    constructor(
-        address _usdc,
-        address _usyc,
-        address _usycTeller,
-        address _storkOracle,
-        address _admin
-    )
+    constructor(address _usdc, address _usyc, address _usycTeller, address _storkOracle, address _admin)
         ERC4626(IERC20(_usdc))
         ERC20("Chariot USDC", "chUSDC")
     {
@@ -151,22 +145,17 @@ contract ChariotVault is ChariotBase, ERC4626 {
     /// @param utilisation The current utilisation ratio (WAD, 18 decimals, 0 to 1e18)
     /// @param usycYield The current USYC/T-bill yield rate (WAD, 18 decimals)
     /// @return supplyRate The combined supply rate (WAD, 18 decimals)
-    function getSupplyRate(
-        uint256 borrowRate,
-        uint256 utilisation,
-        uint256 usycYield
-    ) external pure returns (uint256 supplyRate) {
+    function getSupplyRate(uint256 borrowRate, uint256 utilisation, uint256 usycYield)
+        external
+        pure
+        returns (uint256 supplyRate)
+    {
         // Borrow component: borrowRate * utilisation * (1 - reserveFactor)
-        uint256 borrowComponent = ChariotMath.wadMul(
-            ChariotMath.wadMul(borrowRate, utilisation),
-            1e18 - RESERVE_FACTOR
-        );
+        uint256 borrowComponent = ChariotMath.wadMul(ChariotMath.wadMul(borrowRate, utilisation), 1e18 - RESERVE_FACTOR);
 
         // USYC component: usycYield * (1 - utilisation) * (1 - strategyFee)
-        uint256 usycComponent = ChariotMath.wadMul(
-            ChariotMath.wadMul(usycYield, 1e18 - utilisation),
-            1e18 - STRATEGY_FEE
-        );
+        uint256 usycComponent =
+            ChariotMath.wadMul(ChariotMath.wadMul(usycYield, 1e18 - utilisation), 1e18 - STRATEGY_FEE);
 
         supplyRate = borrowComponent + usycComponent;
     }
@@ -180,5 +169,4 @@ contract ChariotVault is ChariotBase, ERC4626 {
         if (usycBalance == 0) return 0;
         return TELLER.previewRedeem(usycBalance);
     }
-
 }
