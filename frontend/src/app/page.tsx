@@ -24,7 +24,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="bg-[#023436] py-12 mt-20">
         <div className="max-w-[1200px] mx-auto px-8 text-center">
-          <p className="text-white/40 text-sm">Chariot Protocol -- Built on Arc</p>
+          <p className="text-white/40 text-sm">Chariot Protocol - Built on Arc</p>
         </div>
       </footer>
     </div>
