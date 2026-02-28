@@ -4,12 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount, useChainId } from "wagmi";
-import { IconHomeFilled, IconMoneybag, IconCreditCardFilled, IconArrowsExchange, IconClockFilled } from "@tabler/icons-react";
+import { IconHomeFilled, IconCoinFilled, IconCreditCardFilled, IconArrowsExchange, IconClockFilled } from "@tabler/icons-react";
 import { arcTestnet } from "@/lib/chains";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: IconHomeFilled },
-  { href: "/lend", label: "Lend", icon: IconMoneybag },
+  { href: "/lend", label: "Lend", icon: IconCoinFilled },
   { href: "/borrow", label: "Borrow", icon: IconCreditCardFilled },
   { href: "/bridge", label: "Bridge", icon: IconArrowsExchange },
   { href: "/history", label: "History", icon: IconClockFilled },
@@ -22,7 +22,7 @@ export function AppSidebar() {
     <aside className="fixed left-0 top-0 h-screen w-60 flex flex-col bg-[#023436]">
       {/* Logo */}
       <div className="flex items-center gap-2 px-6 py-6">
-        <Image src="/chariot-light.svg" alt="Chariot" width={140} height={32} />
+        <Image src="/chariot-light.svg" alt="Chariot" width={110} height={25} />
       </div>
 
       {/* Navigation */}

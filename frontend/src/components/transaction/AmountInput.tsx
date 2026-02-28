@@ -67,36 +67,24 @@ export function AmountInput({
   return (
     <div className="space-y-2">
       <div
-        className={`border bg-white p-4 transition-colors ${
+        className={`border bg-[#F8FAFA] p-5 transition-colors ${
           hasError
             ? "border-[#F59E0B]"
             : "border-[rgba(3,121,113,0.15)] focus-within:border-[#03B5AA]"
         }`}
       >
-        <div className="flex items-center gap-3">
-          {/* Token icon + symbol */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="w-7 h-7 bg-[#023436] flex items-center justify-center">
-              <span className="text-white text-[10px] font-bold font-[family-name:var(--font-heading)]">
+        {/* Token selector row */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-[#023436] flex items-center justify-center">
+              <span className="text-white text-xs font-bold font-[family-name:var(--font-heading)] leading-none">
                 {tokenSymbol.slice(0, 1)}
               </span>
             </div>
-            <span className="text-sm font-medium text-[#023436]">
+            <span className="text-sm font-semibold text-[#023436] tracking-tight">
               {tokenSymbol}
             </span>
           </div>
-
-          {/* Amount input */}
-          <input
-            ref={inputRef}
-            type="text"
-            inputMode="decimal"
-            placeholder="0.00"
-            value={value}
-            onChange={handleChange}
-            disabled={disabled}
-            className="flex-1 text-right text-xl font-semibold font-[family-name:var(--font-heading)] tabular-nums text-[#023436] bg-transparent outline-none placeholder:text-[#9CA3AF] disabled:opacity-50"
-          />
 
           {/* Max button */}
           <Button
@@ -104,28 +92,40 @@ export function AmountInput({
             size="xs"
             onClick={handleMax}
             disabled={disabled || !balance}
-            className="text-[#03B5AA] hover:text-[#037971] hover:bg-transparent shrink-0"
+            className="text-[10px] uppercase tracking-widest font-bold text-[#03B5AA] hover:text-[#037971] hover:bg-transparent shrink-0"
           >
             Max
           </Button>
         </div>
 
+        {/* Amount input */}
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="decimal"
+          placeholder="0.00"
+          value={value}
+          onChange={handleChange}
+          disabled={disabled}
+          className="w-full text-right text-3xl font-semibold font-[family-name:var(--font-heading)] tabular-nums text-[#023436] bg-transparent outline-none placeholder:text-[#C4CED0] disabled:opacity-50"
+        />
+
         {/* Balance + USD conversion row */}
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[rgba(3,121,113,0.10)]">
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-[rgba(3,121,113,0.08)]">
           <div className="text-xs text-[#6B8A8D]">
             {balanceLoading ? (
-              <span className="inline-block w-20 h-3 bg-[#F8FAFA] animate-pulse" />
+              <span className="inline-block w-24 h-3 bg-white animate-pulse" />
             ) : balance !== undefined ? (
               <>
                 Balance:{" "}
-                <span className="tabular-nums font-medium">
+                <span className="tabular-nums font-medium text-[#023436]">
                   {balance} {tokenSymbol}
                 </span>
               </>
             ) : null}
           </div>
           {usdValue && (
-            <span className="text-xs text-[#9CA3AF] tabular-nums">
+            <span className="text-xs text-[#6B8A8D] tabular-nums">
               {usdValue}
             </span>
           )}
