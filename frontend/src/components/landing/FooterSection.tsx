@@ -31,13 +31,13 @@ export function FooterSection() {
               height={28}
               className="mb-4"
             />
-            <p className="text-sm text-white/40">
+            <p className="text-base text-white/60">
               Crosschain collateral lending on Arc.
             </p>
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-4">
+            <p className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4">
               Protocol
             </p>
             <ul className="space-y-3">
@@ -45,7 +45,7 @@ export function FooterSection() {
                 <li key={link.name}>
                   <Link
                     href={link.href}
-                    className="text-sm text-white/40 hover:text-white transition-colors"
+                    className="text-base text-white/60 hover:text-white transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -55,7 +55,7 @@ export function FooterSection() {
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-4">
+            <p className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4">
               Product
             </p>
             <ul className="space-y-3">
@@ -63,7 +63,7 @@ export function FooterSection() {
                 <li key={link.name}>
                   <Link
                     href={link.href}
-                    className="text-sm text-white/40 hover:text-white transition-colors"
+                    className="text-base text-white/60 hover:text-white transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -73,7 +73,7 @@ export function FooterSection() {
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-4">
+            <p className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4">
               Community
             </p>
             <ul className="space-y-3">
@@ -81,7 +81,7 @@ export function FooterSection() {
                 <li key={link.name}>
                   <Link
                     href={link.href}
-                    className="text-sm text-white/40 hover:text-white transition-colors"
+                    className="text-base text-white/60 hover:text-white transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -92,10 +92,10 @@ export function FooterSection() {
         </div>
 
         <div className="border-t border-white/10 pt-8 flex items-center justify-between">
-          <p className="text-xs text-white/30">
+          <p className="text-sm text-white/50">
             &copy; 2026 Chariot. All rights reserved.
           </p>
-          <p className="text-xs text-white/30">Built on Arc.</p>
+          <p className="text-sm text-white/50">Built on Arc.</p>
         </div>
       </div>
     </footer>

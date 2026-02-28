@@ -51,8 +51,8 @@
   --color-chariot-secondary: #037971;
   --color-chariot-accent: #03B5AA;
   --color-chariot-surface: #F8FAFA;
-  --color-chariot-muted: #6B8A8D;
-  --color-chariot-muted-foreground: #9CA3AF;
+  --color-chariot-muted: #3D5C5F;
+  --color-chariot-muted-foreground: #6B8A8D;
   --color-chariot-border: rgba(3, 121, 113, 0.15);
   --color-chariot-destructive: #DC2626;
   --color-chariot-warning: #F59E0B;
@@ -72,7 +72,7 @@
   --secondary: #037971;
   --secondary-foreground: #FFFFFF;
   --muted: #F8FAFA;
-  --muted-foreground: #6B8A8D;
+  --muted-foreground: #3D5C5F;
   --accent: #03B5AA;
   --accent-foreground: #FFFFFF;
   --destructive: #DC2626;
@@ -83,7 +83,7 @@
   --chart-2: #037971;
   --chart-3: #03B5AA;
   --chart-4: #F8FAFA;
-  --chart-5: #6B8A8D;
+  --chart-5: #3D5C5F;
   --sidebar: #023436;
   --sidebar-foreground: #FFFFFF;
   --sidebar-primary: #037971;
@@ -101,6 +101,7 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-body), sans-serif;
+    font-weight: 500;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

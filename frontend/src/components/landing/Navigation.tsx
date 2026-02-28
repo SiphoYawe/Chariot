@@ -26,7 +26,7 @@ export function Navigation() {
             <Link
               key={link.name}
               href={link.href}
-              className="text-sm font-medium text-[#6B8A8D] hover:text-[#023436] transition-colors"
+              className="text-[15px] font-semibold text-[#3D5C5F] hover:text-[#023436] transition-colors"
             >
               {link.name}
             </Link>
@@ -36,13 +36,13 @@ export function Navigation() {
         <div className="flex items-center gap-3">
           <Link
             href="/lend"
-            className="inline-flex items-center justify-center h-9 px-5 text-sm font-medium text-[#03B5AA] border border-[#03B5AA] hover:bg-[#03B5AA] hover:text-white transition-colors"
+            className="inline-flex items-center justify-center h-9 px-5 text-[15px] font-semibold text-white bg-[#03B5AA] hover:bg-[#037971] transition-colors"
           >
             Start Earning
           </Link>
           <Link
             href="/borrow"
-            className="inline-flex items-center justify-center h-9 px-5 text-sm font-medium text-[#03B5AA] border border-[#03B5AA] hover:bg-[#03B5AA] hover:text-white transition-colors"
+            className="inline-flex items-center justify-center h-9 px-5 text-[15px] font-semibold text-[#023436] border border-[#023436] hover:bg-[#023436] hover:text-white transition-colors"
           >
             Start Borrowing
           </Link>

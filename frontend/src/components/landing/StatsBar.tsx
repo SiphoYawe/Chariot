@@ -1,6 +1,6 @@
 const stats = [
-  { value: "$X.XX M", label: "Total Value Locked" },
-  { value: "X.XX%", label: "Current Supply Rate" },
+  { value: "$1.2M", label: "Total Value Locked" },
+  { value: "3.60%", label: "Current Supply Rate" },
   { value: "2", label: "Supported Networks" },
   { value: "< $0.01", label: "Average Cost" },
 ];
@@ -11,10 +11,10 @@ export function StatsBar() {
       <div className="max-w-[1200px] mx-auto px-8 py-8 grid grid-cols-4 gap-8">
         {stats.map((stat) => (
           <div key={stat.label} className="text-center">
-            <p className="tabular-nums text-3xl font-bold text-white mb-2">
+            <p className="tabular-nums text-4xl font-bold text-white mb-2">
               {stat.value}
             </p>
-            <p className="text-xs font-medium uppercase tracking-wider text-white/50">
+            <p className="text-sm font-medium uppercase tracking-wider text-white/60">
               {stat.label}
             </p>
           </div>

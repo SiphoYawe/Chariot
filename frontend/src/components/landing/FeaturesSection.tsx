@@ -30,10 +30,10 @@ export function FeaturesSection() {
     <section id="features" className="py-20">
       <div className="max-w-[1200px] mx-auto px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold text-[#023436] mb-4">
+          <h2 className="text-4xl font-bold text-[#023436] mb-4">
             Built for both sides of the market.
           </h2>
-          <p className="text-lg text-[#6B8A8D] max-w-[600px] mx-auto">
+          <p className="text-xl text-[#3D5C5F] max-w-[640px] mx-auto">
             Three mechanisms working together so lenders never earn zero and
             borrowers never overpay.
           </p>
@@ -44,13 +44,11 @@ export function FeaturesSection() {
               key={feature.title}
               className="bg-white p-8 border border-[rgba(3,121,113,0.15)]"
             >
-              <div className="w-12 h-12 flex items-center justify-center bg-[#F8FAFA] mb-6">
-                <feature.icon size={24} className="text-[#037971]" />
-              </div>
-              <h3 className="text-lg font-semibold text-[#023436] mb-3">
+              <feature.icon size={44} className="text-[#037971] mb-6" />
+              <h3 className="text-xl font-semibold text-[#023436] mb-3">
                 {feature.title}
               </h3>
-              <p className="text-sm leading-relaxed text-[#6B8A8D]">
+              <p className="text-base leading-relaxed text-[#3D5C5F]">
                 {feature.description}
               </p>
             </div>
