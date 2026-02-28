@@ -53,27 +53,12 @@ function filterByPeriod(data: UtilisationDataPoint[], period: TimePeriod): Utili
   return data.filter((d) => d.timestamp >= cutoff);
 }
 
-function generateSeedData(): UtilisationDataPoint[] {
-  const now = Date.now();
-  const points: UtilisationDataPoint[] = [];
-  const intervals = 720;
-  const intervalMs = (30 * 24 * 60 * 60 * 1000) / intervals;
-
-  for (let i = 0; i < intervals; i++) {
-    const timestamp = now - (intervals - i) * intervalMs;
-    const base = 45;
-    const noise = Math.sin(i * 0.08) * 12 + Math.cos(i * 0.15) * 5;
-    const utilisation = Math.max(5, Math.min(95, base + noise));
-    points.push({ timestamp, utilisation });
-  }
-
-  return points;
-}
-
 function getInitialSnapshots(): UtilisationDataPoint[] {
-  const stored = loadSnapshots();
-  if (stored.length > 0) return stored;
-  return generateSeedData();
+  try {
+    return loadSnapshots();
+  } catch {
+    return [];
+  }
 }
 
 export function useUtilisationHistory(period: TimePeriod = "7d") {
@@ -124,7 +109,7 @@ export function useUtilisationHistory(period: TimePeriod = "7d") {
     setIsError(false);
     try {
       const stored = loadSnapshots();
-      snapshotsRef.current = stored.length > 0 ? stored : generateSeedData();
+      snapshotsRef.current = stored;
       saveSnapshots(snapshotsRef.current);
       setVersion((v) => v + 1);
     } catch {

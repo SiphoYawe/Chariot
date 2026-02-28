@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { useVaultMetrics } from "./useVaultMetrics";
+import { useReadContract } from "wagmi";
+import {
+  ChariotVaultABI,
+  LendingPoolABI,
+  CHARIOT_ADDRESSES,
+  POLLING_INTERVAL_MS,
+  USDC_ERC20_DECIMALS,
+} from "@chariot/shared";
 import { MIN_SNAPSHOT_INTERVAL_MS } from "@/types/charts";
 
 export interface ProtocolKPIData {
@@ -23,6 +30,7 @@ interface KPISnapshot {
   revenue: number;
 }
 
+const USDC_DIVISOR = 10 ** USDC_ERC20_DECIMALS;
 const STORAGE_KEY = "chariot_kpi_history";
 const MAX_SNAPSHOTS = 720; // ~30 days at 1h intervals
 const HISTORY_LENGTH = 20; // spark chart data points
@@ -62,50 +70,68 @@ function saveSnapshots(snapshots: KPISnapshot[]) {
   }
 }
 
-function generateSeedData(): KPISnapshot[] {
-  const now = Date.now();
-  const points: KPISnapshot[] = [];
-  const intervals = 100;
-  const intervalMs = (30 * 24 * 60 * 60 * 1000) / intervals;
-
-  for (let i = 0; i < intervals; i++) {
-    const timestamp = now - (intervals - i) * intervalMs;
-    const progress = i / intervals;
-    // TVL grows from 500K to 1M
-    const tvl = 500_000 + progress * 500_000 + Math.sin(i * 0.1) * 20_000;
-    // Total borrowed grows from 100K to 450K
-    const totalBorrowed = 100_000 + progress * 350_000 + Math.sin(i * 0.15) * 15_000;
-    // Active positions grow from 5 to 25
-    const activePositions = Math.round(5 + progress * 20 + Math.sin(i * 0.2) * 3);
-    // Revenue accumulates
-    const revenue = progress * 12_500 + Math.sin(i * 0.05) * 500;
-    points.push({ timestamp, tvl, totalBorrowed, activePositions, revenue });
-  }
-
-  return points;
-}
-
-function getInitialSnapshots(): KPISnapshot[] {
-  const stored = loadSnapshots();
-  if (stored.length > 0) return stored;
-  return generateSeedData();
-}
-
-function extractHistory(snapshots: KPISnapshot[], key: keyof Omit<KPISnapshot, "timestamp">): number[] {
+function extractHistory(
+  snapshots: KPISnapshot[],
+  key: keyof Omit<KPISnapshot, "timestamp">
+): number[] {
   const recent = snapshots.slice(-HISTORY_LENGTH);
   return recent.map((s) => s[key]);
 }
 
+/**
+ * Hook for protocol KPIs.
+ * Reads vault.totalAssets (TVL), lendingPool.getTotalBorrowed,
+ * lendingPool.getTotalReserves (revenue proxy), and computes utilisation.
+ * Unique depositors returns 0 for MVP since we cannot easily count on-chain.
+ * Maintains a localStorage-backed history for spark charts.
+ */
 export function useProtocolKPIs() {
   const [version, setVersion] = useState(0);
   const [isError, setIsError] = useState(false);
   const snapshotsRef = useRef<KPISnapshot[] | null>(null);
 
-  const { data: metrics } = useVaultMetrics();
+  // Read TVL (totalAssets)
+  const {
+    data: rawTotalAssets,
+    isLoading: loadingAssets,
+    isError: errorAssets,
+    refetch: refetchAssets,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.CHARIOT_VAULT,
+    abi: ChariotVaultABI,
+    functionName: "totalAssets",
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
 
-  // Lazy-initialize
+  // Read totalBorrowed
+  const {
+    data: rawTotalBorrowed,
+    isLoading: loadingBorrowed,
+    isError: errorBorrowed,
+    refetch: refetchBorrowed,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.LENDING_POOL,
+    abi: LendingPoolABI,
+    functionName: "getTotalBorrowed",
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
+
+  // Read totalReserves (revenue proxy)
+  const {
+    data: rawTotalReserves,
+    isLoading: loadingReserves,
+    isError: errorReserves,
+    refetch: refetchReserves,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.LENDING_POOL,
+    abi: LendingPoolABI,
+    functionName: "getTotalReserves",
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
+
+  // Lazy-initialize snapshots from localStorage
   if (snapshotsRef.current === null && typeof window !== "undefined") {
-    snapshotsRef.current = getInitialSnapshots();
+    snapshotsRef.current = loadSnapshots();
   }
 
   // Persist on mount
@@ -115,16 +141,27 @@ export function useProtocolKPIs() {
     }
   }, []);
 
-  // Record new snapshots
+  // Record new snapshots when contract data updates
   useEffect(() => {
-    if (!metrics || !snapshotsRef.current) return;
+    if (
+      rawTotalAssets === undefined ||
+      rawTotalBorrowed === undefined ||
+      rawTotalReserves === undefined ||
+      !snapshotsRef.current
+    ) {
+      return;
+    }
+
+    const tvl = Number(rawTotalAssets) / USDC_DIVISOR;
+    const totalBorrowed = Number(rawTotalBorrowed) / USDC_DIVISOR;
+    const revenue = Number(rawTotalReserves) / USDC_DIVISOR;
 
     const snapshot: KPISnapshot = {
       timestamp: Date.now(),
-      tvl: metrics.totalAssets,
-      totalBorrowed: metrics.totalBorrowed,
-      activePositions: 18, // mock -- would come from event indexing
-      revenue: 8_750, // mock -- would come from fee accumulator
+      tvl,
+      totalBorrowed,
+      activePositions: 0, // Cannot count on-chain for MVP
+      revenue,
     };
 
     const last = snapshotsRef.current[snapshotsRef.current.length - 1];
@@ -133,37 +170,67 @@ export function useProtocolKPIs() {
       saveSnapshots(snapshotsRef.current);
       setVersion((v) => v + 1);
     }
-  }, [metrics]);
+  }, [rawTotalAssets, rawTotalBorrowed, rawTotalReserves]);
+
+  const contractError = errorAssets || errorBorrowed || errorReserves;
 
   const data = useMemo((): ProtocolKPIData | null => {
-    if (!snapshotsRef.current || snapshotsRef.current.length === 0) return null;
-    const latest = snapshotsRef.current[snapshotsRef.current.length - 1];
+    if (
+      rawTotalAssets === undefined ||
+      rawTotalBorrowed === undefined ||
+      rawTotalReserves === undefined
+    ) {
+      // If we have historical snapshots, show the latest from history
+      if (snapshotsRef.current && snapshotsRef.current.length > 0) {
+        const latest = snapshotsRef.current[snapshotsRef.current.length - 1];
+        return {
+          tvl: latest.tvl,
+          totalBorrowed: latest.totalBorrowed,
+          activePositions: latest.activePositions,
+          revenue: latest.revenue,
+          tvlHistory: extractHistory(snapshotsRef.current, "tvl"),
+          borrowedHistory: extractHistory(snapshotsRef.current, "totalBorrowed"),
+          positionsHistory: extractHistory(
+            snapshotsRef.current,
+            "activePositions"
+          ),
+          revenueHistory: extractHistory(snapshotsRef.current, "revenue"),
+        };
+      }
+      return null;
+    }
+
+    const tvl = Number(rawTotalAssets) / USDC_DIVISOR;
+    const totalBorrowed = Number(rawTotalBorrowed) / USDC_DIVISOR;
+    const revenue = Number(rawTotalReserves) / USDC_DIVISOR;
+
+    const snapshots = snapshotsRef.current ?? [];
+
     return {
-      tvl: latest.tvl,
-      totalBorrowed: latest.totalBorrowed,
-      activePositions: latest.activePositions,
-      revenue: latest.revenue,
-      tvlHistory: extractHistory(snapshotsRef.current, "tvl"),
-      borrowedHistory: extractHistory(snapshotsRef.current, "totalBorrowed"),
-      positionsHistory: extractHistory(snapshotsRef.current, "activePositions"),
-      revenueHistory: extractHistory(snapshotsRef.current, "revenue"),
+      tvl,
+      totalBorrowed,
+      activePositions: 0, // Cannot count unique depositors on-chain for MVP
+      revenue,
+      tvlHistory: extractHistory(snapshots, "tvl"),
+      borrowedHistory: extractHistory(snapshots, "totalBorrowed"),
+      positionsHistory: extractHistory(snapshots, "activePositions"),
+      revenueHistory: extractHistory(snapshots, "revenue"),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version]);
+  }, [rawTotalAssets, rawTotalBorrowed, rawTotalReserves, version]);
 
-  const isLoading = snapshotsRef.current === null;
+  const isLoading =
+    snapshotsRef.current === null ||
+    loadingAssets ||
+    loadingBorrowed ||
+    loadingReserves;
 
   const refetch = useCallback(() => {
     setIsError(false);
-    try {
-      const stored = loadSnapshots();
-      snapshotsRef.current = stored.length > 0 ? stored : generateSeedData();
-      saveSnapshots(snapshotsRef.current);
-      setVersion((v) => v + 1);
-    } catch {
-      setIsError(true);
-    }
-  }, []);
+    refetchAssets();
+    refetchBorrowed();
+    refetchReserves();
+  }, [refetchAssets, refetchBorrowed, refetchReserves]);
 
-  return { data, isLoading, isError, refetch };
+  return { data, isLoading, isError: isError || contractError, refetch };
 }

@@ -1,7 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { POLLING_INTERVAL_MS, RISK_PARAMS } from "@chariot/shared";
+import { useMemo, useCallback } from "react";
+import { useReadContract } from "wagmi";
+import {
+  RiskParameterEngineABI,
+  CHARIOT_ADDRESSES,
+  POLLING_INTERVAL_MS,
+  RISK_PARAMS,
+} from "@chariot/shared";
 
 interface RiskParametersData {
   /** Dynamic effective LTV (0-1, e.g., 0.70 = 70%) */
@@ -16,76 +22,73 @@ interface RiskParametersData {
   isEngineAvailable: boolean;
 }
 
-function getMockRiskParameters(): RiskParametersData {
-  // Mock: simulate moderately elevated volatility (35%)
-  const currentVolatility = 0.35;
-  const baseLTV = RISK_PARAMS.BRIDGED_ETH.BASE_LTV;
-  const baselineVol = 0.25;
-  const kLtv = 0.5;
-  const minFloor = 0.30;
-
-  const excess = Math.max(0, currentVolatility - baselineVol);
-  const adjustment = kLtv * excess;
-  const effectiveLTV = Math.max(minFloor, baseLTV - adjustment);
-  const liquidationThreshold = effectiveLTV + 0.07;
-
-  return {
-    effectiveLTV,
-    liquidationThreshold,
-    currentVolatility,
-    baseLTV,
-    isEngineAvailable: true,
-  };
-}
+const WAD = BigInt(10) ** BigInt(18);
 
 /**
  * Hook for fetching dynamic risk parameters from RiskParameterEngine.
- *
- * When ABIs are populated, replace with:
- * - useReadContract for RiskParameterEngine.getRiskParameters(collateralToken)
- * - useReadContract for RiskParameterEngine.getBaseLTV(collateralToken)
- * Poll every 12 seconds (1 Arc block).
+ * Reads riskParameterEngine.getRiskParameters(BRIDGED_ETH) which returns
+ * (effectiveLTV, liquidationThreshold, currentVolatility) all in WAD.
  */
 export function useRiskParameters(_collateralToken?: `0x${string}`) {
-  const [data, setData] = useState<RiskParametersData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
+  const token = _collateralToken ?? CHARIOT_ADDRESSES.BRIDGED_ETH;
 
-  useEffect(() => {
-    let active = true;
-    const load = () => {
-      setTimeout(() => {
-        if (!active) return;
-        try {
-          setData(getMockRiskParameters());
-          setIsLoading(false);
-        } catch {
-          setIsError(true);
-          setIsLoading(false);
-        }
-      }, 200);
+  const {
+    data: rawRiskParams,
+    isLoading: loadingParams,
+    isError: errorParams,
+    refetch: refetchParams,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.RISK_PARAMETER_ENGINE,
+    abi: RiskParameterEngineABI,
+    functionName: "getRiskParameters",
+    args: [token],
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
+
+  const {
+    data: rawBaseLTV,
+    isLoading: loadingBase,
+    isError: errorBase,
+    refetch: refetchBase,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.RISK_PARAMETER_ENGINE,
+    abi: RiskParameterEngineABI,
+    functionName: "getBaseLTV",
+    args: [token],
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
+
+  const isLoading = loadingParams || loadingBase;
+  const isError = errorParams || errorBase;
+
+  const data = useMemo((): RiskParametersData | null => {
+    if (rawRiskParams === undefined) return null;
+
+    // getRiskParameters returns [effectiveLTV, liquidationThreshold, currentVolatility]
+    const params = rawRiskParams as readonly [bigint, bigint, bigint];
+    const effectiveLTV = Number(params[0]) / Number(WAD);
+    const liquidationThreshold = Number(params[1]) / Number(WAD);
+    const currentVolatility = Number(params[2]) / Number(WAD);
+
+    // baseLTV from separate call, or fallback to constant
+    const baseLTV =
+      rawBaseLTV !== undefined
+        ? Number(rawBaseLTV) / Number(WAD)
+        : RISK_PARAMS.BRIDGED_ETH.BASE_LTV;
+
+    return {
+      effectiveLTV,
+      liquidationThreshold,
+      currentVolatility,
+      baseLTV,
+      isEngineAvailable: true,
     };
-    load();
-    const interval = setInterval(load, POLLING_INTERVAL_MS);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [_collateralToken]);
+  }, [rawRiskParams, rawBaseLTV]);
 
   const refetch = useCallback(() => {
-    setIsLoading(true);
-    setIsError(false);
-    setTimeout(() => {
-      try {
-        setData(getMockRiskParameters());
-        setIsLoading(false);
-      } catch {
-        setIsError(true);
-        setIsLoading(false);
-      }
-    }, 200);
-  }, []);
+    refetchParams();
+    refetchBase();
+  }, [refetchParams, refetchBase]);
 
   return { data, isLoading, isError, refetch };
 }

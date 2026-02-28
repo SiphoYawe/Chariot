@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useReadContract } from "wagmi";
+import { ETHEscrowABI, BridgedETHABI, CHARIOT_ADDRESSES } from "@chariot/shared";
+import { useAccount } from "wagmi";
 
 export type BridgeStep = "locked" | "relayer" | "minting" | "deposited";
 
@@ -19,20 +22,45 @@ interface BridgeStatusData {
   startedAt: number;
 }
 
-const STEPS: BridgeStep[] = ["locked", "relayer", "minting", "deposited"];
-const DELAY_THRESHOLD_MS = 120_000; // 2 minutes
+const ETH_ESCROW_SEPOLIA = CHARIOT_ADDRESSES.ETH_ESCROW;
+const DELAY_THRESHOLD_S = 120; // 2 minutes
+const ETH_SEPOLIA_CHAIN_ID = 11155111;
 
 /**
- * Hook for tracking the bridge progress from Sepolia to Arc.
- * Polls for BridgedETH balance on Arc to detect completion.
- * Uses mock progression until contracts are deployed.
- *
- * When ABIs are populated, replace with:
- * - useReadContract for BridgedETH.balanceOf on Arc (poll every 12s)
- * - useReadContract for CollateralManager.getCollateralBalance on Arc
- * - Compare against previous values to detect step transitions
+ * Hook for tracking the ETH bridge progress from Sepolia to Arc.
+ * Reads ETHEscrow.getDeposit(nonce) on Sepolia to check deposit status,
+ * then polls BridgedETH balance on Arc to detect minting completion.
  */
 export function useBridgeStatus(nonce: number | null) {
+  const [startedAt] = useState(() => Math.floor(Date.now() / 1000));
+  const { address } = useAccount();
+
+  // Read deposit status from ETHEscrow on Sepolia
+  const { data: depositData, isLoading: isDepositLoading } = useReadContract({
+    address: ETH_ESCROW_SEPOLIA,
+    abi: ETHEscrowABI,
+    functionName: "getDeposit",
+    args: nonce !== null ? [BigInt(nonce)] : undefined,
+    chainId: ETH_SEPOLIA_CHAIN_ID,
+    query: {
+      enabled: nonce !== null,
+      refetchInterval: 6_000,
+    },
+  });
+
+  // Read BridgedETH balance on Arc to detect minting
+  const { data: bridgedBalance } = useReadContract({
+    address: CHARIOT_ADDRESSES.BRIDGED_ETH,
+    abi: BridgedETHABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && nonce !== null,
+      refetchInterval: 6_000,
+    },
+  });
+
+  const [prevBalance] = useState<bigint | null>(null);
   const [data, setData] = useState<BridgeStatusData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -42,51 +70,49 @@ export function useBridgeStatus(nonce: number | null) {
       return;
     }
 
-    setIsLoading(true);
-    const startedAt = Date.now();
-    let stepIndex = 0;
+    const elapsed = Math.floor(Date.now() / 1000) - startedAt;
+    const isDelayed = elapsed > DELAY_THRESHOLD_S;
 
-    // Simulate bridge progression
-    const advance = () => {
-      const elapsed = Date.now() - startedAt;
-      const isDelayed = elapsed > DELAY_THRESHOLD_MS;
+    // Determine step based on deposit status
+    // Status enum: 0=Pending, 1=Processed, 2=Expired
+    const deposit = depositData as { depositor: string; amount: bigint; timestamp: bigint; status: number } | undefined;
+    const depositStatus = deposit ? Number(deposit.status) : 0;
 
-      if (stepIndex < STEPS.length - 1) {
-        stepIndex++;
+    let currentStep: BridgeStep;
+    let stepIndex: number;
+
+    if (depositStatus === 0) {
+      // Deposit pending -- locked on Sepolia
+      currentStep = "locked";
+      stepIndex = 0;
+    } else if (depositStatus === 1) {
+      // Deposit processed by relayer
+      // Check if bridged balance increased (minting happened)
+      if (bridgedBalance && prevBalance !== null && bridgedBalance > prevBalance) {
+        currentStep = "deposited";
+        stepIndex = 3;
+      } else {
+        currentStep = "minting";
+        stepIndex = 2;
       }
+    } else {
+      // Expired or unknown
+      currentStep = "locked";
+      stepIndex = 0;
+    }
 
-      setData({
-        currentStep: STEPS[stepIndex],
-        stepIndex,
-        isComplete: stepIndex === STEPS.length - 1,
-        isDelayed,
-        estimatedTimeRemaining:
-          stepIndex < STEPS.length - 1
-            ? Math.max(0, Math.ceil((30 - elapsed / 1000) * (STEPS.length - 1 - stepIndex)))
-            : null,
-        startedAt: Math.floor(startedAt / 1000),
-      });
-      setIsLoading(false);
-    };
+    const isComplete = stepIndex === 3;
 
-    // Initial state: locked
     setData({
-      currentStep: "locked",
-      stepIndex: 0,
-      isComplete: false,
-      isDelayed: false,
-      estimatedTimeRemaining: 30,
-      startedAt: Math.floor(startedAt / 1000),
+      currentStep,
+      stepIndex,
+      isComplete,
+      isDelayed,
+      estimatedTimeRemaining: isComplete ? null : Math.max(0, 60 - elapsed),
+      startedAt,
     });
-    setIsLoading(false);
-
-    // Progress through steps
-    const interval = setInterval(advance, 8000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [nonce]);
+    setIsLoading(isDepositLoading);
+  }, [nonce, depositData, bridgedBalance, prevBalance, startedAt, isDepositLoading]);
 
   const reset = useCallback(() => {
     setData(null);

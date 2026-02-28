@@ -1,7 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { POLLING_INTERVAL_MS } from "@chariot/shared";
+import { useMemo, useCallback } from "react";
+import { useReadContract, useAccount } from "wagmi";
+import {
+  CollateralManagerABI,
+  LendingPoolABI,
+  CHARIOT_ADDRESSES,
+  POLLING_INTERVAL_MS,
+  RISK_PARAMS,
+  USDC_ERC20_DECIMALS,
+} from "@chariot/shared";
 
 interface HealthFactorData {
   /** Health factor value (1.0 = liquidation threshold) */
@@ -14,78 +22,97 @@ interface HealthFactorData {
   riskLevel: "safe" | "caution" | "danger" | "none";
 }
 
-function classifyRisk(hf: number, hasDebt: boolean): HealthFactorData["riskLevel"] {
+function classifyRisk(
+  hf: number,
+  hasDebt: boolean
+): HealthFactorData["riskLevel"] {
   if (!hasDebt) return "none";
   if (hf > 1.5) return "safe";
   if (hf >= 1.0) return "caution";
   return "danger";
 }
 
-function getMockHealthFactor(hasDebt: boolean): HealthFactorData {
-  if (!hasDebt) {
-    return {
-      healthFactor: Infinity,
-      isHealthy: true,
-      hasDebt: false,
-      riskLevel: "none",
-    };
-  }
-  const hf = 1.82;
-  return {
-    healthFactor: hf,
-    isHealthy: hf > 1.0,
-    hasDebt: true,
-    riskLevel: classifyRisk(hf, true),
-  };
-}
+const USDC_DIVISOR = 10 ** USDC_ERC20_DECIMALS;
 
 /**
- * Hook for fetching a user's health factor from CollateralManager.
- * Uses mock data until contracts are deployed.
- *
- * When ABIs are populated, replace with:
- * - useReadContract for CollateralManager.getHealthFactor
+ * Hook for fetching a user's health factor.
+ * Reads collateralManager.getCollateralValueView(user) and lendingPool.getUserDebt(user).
+ * HF = (collateralValue * liquidationThreshold) / debt
  */
 export function useHealthFactor(_user?: `0x${string}`) {
-  const [data, setData] = useState<HealthFactorData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
+  const { address: connectedAddress } = useAccount();
+  const user = _user ?? connectedAddress;
 
-  useEffect(() => {
-    let active = true;
-    const load = () => {
-      setTimeout(() => {
-        if (!active) return;
-        try {
-          setData(getMockHealthFactor(false));
-          setIsLoading(false);
-        } catch {
-          setIsError(true);
-          setIsLoading(false);
-        }
-      }, 200);
+  const {
+    data: rawCollateralValue,
+    isLoading: loadingCollateral,
+    isError: errorCollateral,
+    refetch: refetchCollateral,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
+    abi: CollateralManagerABI,
+    functionName: "getCollateralValueView",
+    args: [user!],
+    query: {
+      enabled: !!user,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
+
+  const {
+    data: rawDebt,
+    isLoading: loadingDebt,
+    isError: errorDebt,
+    refetch: refetchDebt,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.LENDING_POOL,
+    abi: LendingPoolABI,
+    functionName: "getUserDebt",
+    args: [user!],
+    query: {
+      enabled: !!user,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
+
+  const isLoading = !user ? false : loadingCollateral || loadingDebt;
+  const isError = errorCollateral || errorDebt;
+
+  const data = useMemo((): HealthFactorData | null => {
+    if (!user) return null;
+    if (rawCollateralValue === undefined || rawDebt === undefined) return null;
+
+    // Both collateralValue and debt are in USDC (6 decimals)
+    const collateralValue = Number(rawCollateralValue) / USDC_DIVISOR;
+    const debt = Number(rawDebt) / USDC_DIVISOR;
+
+    const hasDebt = debt > 0;
+
+    if (!hasDebt) {
+      return {
+        healthFactor: Infinity,
+        isHealthy: true,
+        hasDebt: false,
+        riskLevel: "none",
+      };
+    }
+
+    // HF = (collateralValue * liquidationThreshold) / debt
+    const hf =
+      (collateralValue * RISK_PARAMS.BRIDGED_ETH.LIQUIDATION_THRESHOLD) / debt;
+
+    return {
+      healthFactor: hf,
+      isHealthy: hf > 1.0,
+      hasDebt: true,
+      riskLevel: classifyRisk(hf, true),
     };
-    load();
-    const interval = setInterval(load, POLLING_INTERVAL_MS);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [_user]);
+  }, [user, rawCollateralValue, rawDebt]);
 
   const refetch = useCallback(() => {
-    setIsLoading(true);
-    setIsError(false);
-    setTimeout(() => {
-      try {
-        setData(getMockHealthFactor(false));
-        setIsLoading(false);
-      } catch {
-        setIsError(true);
-        setIsLoading(false);
-      }
-    }, 200);
-  }, []);
+    refetchCollateral();
+    refetchDebt();
+  }, [refetchCollateral, refetchDebt]);
 
   return { data, isLoading, isError, refetch };
 }

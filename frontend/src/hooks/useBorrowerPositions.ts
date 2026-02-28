@@ -1,6 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useCallback } from "react";
+import { useReadContract, useAccount } from "wagmi";
+import {
+  LendingPoolABI,
+  CollateralManagerABI,
+  CHARIOT_ADDRESSES,
+  POLLING_INTERVAL_MS,
+  RISK_PARAMS,
+  USDC_ERC20_DECIMALS,
+} from "@chariot/shared";
 
 export interface BorrowerPosition {
   address: string;
@@ -11,127 +20,114 @@ export interface BorrowerPosition {
   healthFactor: number;
 }
 
-// Mock borrower positions data for demo
-// In production, this would index CollateralDeposited/Borrowed events and query each position
-function getMockPositions(): BorrowerPosition[] {
-  return [
-    {
-      address: "0x1234567890abcdef1234567890abcdef12345678",
-      collateralType: "BridgedETH",
-      collateralAmount: 10.5,
-      collateralValueUSD: 33_075,
-      debtAmount: 22_000,
-      healthFactor: 1.23,
-    },
-    {
-      address: "0xabcdef1234567890abcdef1234567890abcdef12",
-      collateralType: "BridgedETH",
-      collateralAmount: 5.2,
-      collateralValueUSD: 16_380,
-      debtAmount: 12_500,
-      healthFactor: 1.07,
-    },
-    {
-      address: "0x9876543210fedcba9876543210fedcba98765432",
-      collateralType: "BridgedETH",
-      collateralAmount: 25.0,
-      collateralValueUSD: 78_750,
-      debtAmount: 42_000,
-      healthFactor: 1.54,
-    },
-    {
-      address: "0xdeadbeef12345678deadbeef12345678deadbeef",
-      collateralType: "BridgedETH",
-      collateralAmount: 2.1,
-      collateralValueUSD: 6_615,
-      debtAmount: 5_500,
-      healthFactor: 0.98,
-    },
-    {
-      address: "0xcafebabe12345678cafebabe12345678cafebabe",
-      collateralType: "BridgedETH",
-      collateralAmount: 15.8,
-      collateralValueUSD: 49_770,
-      debtAmount: 30_000,
-      healthFactor: 1.36,
-    },
-    {
-      address: "0x1111222233334444555566667777888899990000",
-      collateralType: "BridgedETH",
-      collateralAmount: 8.3,
-      collateralValueUSD: 26_145,
-      debtAmount: 20_000,
-      healthFactor: 1.07,
-    },
-    {
-      address: "0xaaaa1111bbbb2222cccc3333dddd4444eeee5555",
-      collateralType: "BridgedETH",
-      collateralAmount: 3.7,
-      collateralValueUSD: 11_655,
-      debtAmount: 9_200,
-      healthFactor: 1.04,
-    },
-    {
-      address: "0x5555666677778888999900001111222233334444",
-      collateralType: "BridgedETH",
-      collateralAmount: 45.0,
-      collateralValueUSD: 141_750,
-      debtAmount: 75_000,
-      healthFactor: 1.55,
-    },
-  ].sort((a, b) => a.healthFactor - b.healthFactor);
-}
+const WAD = BigInt(10) ** BigInt(18);
+const USDC_DIVISOR = 10 ** USDC_ERC20_DECIMALS;
 
+/**
+ * Hook for fetching borrower positions.
+ * For MVP, shows only the connected user's position.
+ * In production, this would index CollateralDeposited/Borrowed events
+ * and query each borrower's position.
+ */
 export function useBorrowerPositions() {
-  const [positions, setPositions] = useState<BorrowerPosition[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
+  const { address } = useAccount();
 
-  useEffect(() => {
-    let active = true;
-    const load = () => {
-      setTimeout(() => {
-        if (!active) return;
-        try {
-          setPositions(getMockPositions());
-          setIsLoading(false);
-        } catch {
-          setIsError(true);
-          setIsLoading(false);
-        }
-      }, 500);
-    };
-    load();
-    const interval = setInterval(load, 12_000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, []);
+  // Read user debt
+  const {
+    data: rawDebt,
+    isLoading: loadingDebt,
+    isError: errorDebt,
+    refetch: refetchDebt,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.LENDING_POOL,
+    abi: LendingPoolABI,
+    functionName: "getUserDebt",
+    args: [address!],
+    query: {
+      enabled: !!address,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
 
-  const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Read collateral balance
+  const {
+    data: rawCollateral,
+    isLoading: loadingCollateral,
+    isError: errorCollateral,
+    refetch: refetchCollateral,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
+    abi: CollateralManagerABI,
+    functionName: "getCollateralBalance",
+    args: [address!, CHARIOT_ADDRESSES.BRIDGED_ETH],
+    query: {
+      enabled: !!address,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
 
-  // Clean up refetch timer on unmount
-  useEffect(() => {
-    return () => {
-      if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
-    };
-  }, []);
+  // Read ETH price
+  const {
+    data: rawEthPrice,
+    isLoading: loadingPrice,
+    isError: errorPrice,
+    refetch: refetchPrice,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
+    abi: CollateralManagerABI,
+    functionName: "getETHPrice",
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
+
+  const isLoading = !address
+    ? false
+    : loadingDebt || loadingCollateral || loadingPrice;
+  const isError = errorDebt || errorCollateral || errorPrice;
+
+  const positions = useMemo((): BorrowerPosition[] => {
+    if (!address) return [];
+    if (
+      rawDebt === undefined ||
+      rawCollateral === undefined ||
+      rawEthPrice === undefined
+    ) {
+      return [];
+    }
+
+    const debt = Number(rawDebt) / USDC_DIVISOR;
+    const collateralWei = rawCollateral as bigint;
+    const collateralAmount = Number(collateralWei) / Number(WAD);
+    const ethPrice = Number(rawEthPrice) / Number(WAD);
+    const collateralValueUSD = collateralAmount * ethPrice;
+
+    // If user has no position, return empty array
+    if (debt === 0 && collateralAmount === 0) return [];
+
+    // Health factor = (collateralValue * liquidationThreshold) / debt
+    const healthFactor =
+      debt > 0
+        ? (collateralValueUSD *
+            RISK_PARAMS.BRIDGED_ETH.LIQUIDATION_THRESHOLD) /
+          debt
+        : Infinity;
+
+    return [
+      {
+        address,
+        collateralType: "BridgedETH",
+        collateralAmount,
+        collateralValueUSD,
+        debtAmount: debt,
+        healthFactor,
+      },
+    ];
+  }, [address, rawDebt, rawCollateral, rawEthPrice]);
 
   const refetch = useCallback(() => {
-    setIsLoading(true);
-    setIsError(false);
-    if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
-    refetchTimerRef.current = setTimeout(() => {
-      try {
-        setPositions(getMockPositions());
-        setIsLoading(false);
-      } catch {
-        setIsError(true);
-        setIsLoading(false);
-      }
-    }, 500);
-  }, []);
+    refetchDebt();
+    refetchCollateral();
+    refetchPrice();
+  }, [refetchDebt, refetchCollateral, refetchPrice]);
 
   return { positions, isLoading, isError, refetch };
 }

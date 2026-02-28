@@ -1,7 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { POLLING_INTERVAL_MS, RISK_PARAMS } from "@chariot/shared";
+import { useMemo, useCallback } from "react";
+import { useReadContract, useAccount } from "wagmi";
+import {
+  CollateralManagerABI,
+  BridgedETHABI,
+  CHARIOT_ADDRESSES,
+  POLLING_INTERVAL_MS,
+  RISK_PARAMS,
+} from "@chariot/shared";
 
 interface CollateralData {
   /** BridgedETH balance in CollateralManager (wei) */
@@ -16,76 +23,99 @@ interface CollateralData {
   hasCollateral: boolean;
 }
 
-function getMockCollateralData(hasDeposit: boolean): CollateralData {
-  if (!hasDeposit) {
-    return {
-      collateralBalance: BigInt(0),
-      collateralValueUsdc: 0,
-      walletBalance: BigInt(0),
-      effectiveLtv: RISK_PARAMS.BRIDGED_ETH.BASE_LTV,
-      hasCollateral: false,
-    };
-  }
-  // Mock: 5 ETH deposited at ~$2450
-  return {
-    collateralBalance: BigInt("5000000000000000000"), // 5 ETH
-    collateralValueUsdc: 12250, // 5 * $2450
-    walletBalance: BigInt(0),
-    effectiveLtv: RISK_PARAMS.BRIDGED_ETH.BASE_LTV,
-    hasCollateral: true,
-  };
-}
+const WAD = BigInt(10) ** BigInt(18);
 
 /**
  * Hook for fetching a user's collateral data from CollateralManager.
- * Uses mock data until contracts are deployed.
- *
- * When ABIs are populated, replace with:
- * - useReadContract for CollateralManager.getCollateralBalance
- * - useReadContract for BridgedETH.balanceOf (wallet balance)
- * - useReadContract for CollateralManager.getCollateralValue
+ * Reads collateralManager.getCollateralBalance(user, BRIDGED_ETH), getETHPrice(),
+ * and BridgedETH.balanceOf(user) for the wallet balance.
  */
 export function useCollateralData(_user?: `0x${string}`) {
-  const [data, setData] = useState<CollateralData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
+  const { address: connectedAddress } = useAccount();
+  const user = _user ?? connectedAddress;
 
-  useEffect(() => {
-    let active = true;
-    const load = () => {
-      setTimeout(() => {
-        if (!active) return;
-        try {
-          // Mock: simulate no collateral for new users
-          setData(getMockCollateralData(false));
-          setIsLoading(false);
-        } catch {
-          setIsError(true);
-          setIsLoading(false);
-        }
-      }, 300);
+  const {
+    data: rawCollateralBalance,
+    isLoading: loadingCollateral,
+    isError: errorCollateral,
+    refetch: refetchCollateral,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
+    abi: CollateralManagerABI,
+    functionName: "getCollateralBalance",
+    args: [user!, CHARIOT_ADDRESSES.BRIDGED_ETH],
+    query: {
+      enabled: !!user,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
+
+  const {
+    data: rawEthPrice,
+    isLoading: loadingPrice,
+    isError: errorPrice,
+    refetch: refetchPrice,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
+    abi: CollateralManagerABI,
+    functionName: "getETHPrice",
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
+
+  const {
+    data: rawWalletBalance,
+    isLoading: loadingWallet,
+    isError: errorWallet,
+    refetch: refetchWallet,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.BRIDGED_ETH,
+    abi: BridgedETHABI,
+    functionName: "balanceOf",
+    args: [user!],
+    query: {
+      enabled: !!user,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
+
+  const isLoading = !user
+    ? false
+    : loadingCollateral || loadingPrice || loadingWallet;
+  const isError = errorCollateral || errorPrice || errorWallet;
+
+  const data = useMemo((): CollateralData | null => {
+    if (!user) return null;
+    if (
+      rawCollateralBalance === undefined ||
+      rawEthPrice === undefined ||
+      rawWalletBalance === undefined
+    ) {
+      return null;
+    }
+
+    const collateralBalance = rawCollateralBalance as bigint;
+    const walletBalance = rawWalletBalance as bigint;
+    const ethPrice = Number(rawEthPrice) / Number(WAD);
+
+    // collateralBalance is in wei (18 decimals), convert to ETH then to USD
+    const collateralEth = Number(collateralBalance) / Number(WAD);
+    const collateralValueUsdc = collateralEth * ethPrice;
+    const hasCollateral = collateralBalance > BigInt(0);
+
+    return {
+      collateralBalance,
+      collateralValueUsdc,
+      walletBalance,
+      effectiveLtv: RISK_PARAMS.BRIDGED_ETH.BASE_LTV,
+      hasCollateral,
     };
-    load();
-    const interval = setInterval(load, POLLING_INTERVAL_MS);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [_user]);
+  }, [user, rawCollateralBalance, rawEthPrice, rawWalletBalance]);
 
   const refetch = useCallback(() => {
-    setIsLoading(true);
-    setIsError(false);
-    setTimeout(() => {
-      try {
-        setData(getMockCollateralData(false));
-        setIsLoading(false);
-      } catch {
-        setIsError(true);
-        setIsLoading(false);
-      }
-    }, 300);
-  }, []);
+    refetchCollateral();
+    refetchPrice();
+    refetchWallet();
+  }, [refetchCollateral, refetchPrice, refetchWallet]);
 
   return { data, isLoading, isError, refetch };
 }

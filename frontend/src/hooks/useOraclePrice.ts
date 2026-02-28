@@ -1,59 +1,50 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useCallback } from "react";
+import { useReadContract } from "wagmi";
+import {
+  CollateralManagerABI,
+  CHARIOT_ADDRESSES,
+  POLLING_INTERVAL_MS,
+} from "@chariot/shared";
 
 interface OraclePriceData {
   ethPrice: number;
   lastUpdated: number; // Unix timestamp in seconds
 }
 
-function getMockOracleData(): OraclePriceData {
-  return {
-    ethPrice: 3456.78,
-    lastUpdated: Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 15),
-  };
-}
+const WAD = BigInt(10) ** BigInt(18);
 
 export function useOraclePrice() {
-  const [data, setData] = useState<OraclePriceData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
+  const {
+    data: rawPrice,
+    isLoading,
+    isError,
+    refetch: refetchContract,
+    dataUpdatedAt,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
+    abi: CollateralManagerABI,
+    functionName: "getETHPrice",
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
 
-  useEffect(() => {
-    let active = true;
-    const load = () => {
-      setTimeout(() => {
-        if (!active) return;
-        try {
-          setData(getMockOracleData());
-          setIsLoading(false);
-        } catch {
-          setIsError(true);
-          setIsLoading(false);
-        }
-      }, 300);
-    };
-    load();
-    const interval = setInterval(load, 12_000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, []);
+  const data = useMemo((): OraclePriceData | null => {
+    if (rawPrice === undefined) return null;
+
+    // ETH price from oracle is in WAD (18 decimals)
+    const ethPrice = Number(rawPrice) / Number(WAD);
+    // Use the query's data update time as an approximation of last updated
+    const lastUpdated = dataUpdatedAt
+      ? Math.floor(dataUpdatedAt / 1000)
+      : Math.floor(Date.now() / 1000);
+
+    return { ethPrice, lastUpdated };
+  }, [rawPrice, dataUpdatedAt]);
 
   const refetch = useCallback(() => {
-    setIsLoading(true);
-    setIsError(false);
-    setTimeout(() => {
-      try {
-        setData(getMockOracleData());
-        setIsLoading(false);
-      } catch {
-        setIsError(true);
-        setIsLoading(false);
-      }
-    }, 300);
-  }, []);
+    refetchContract();
+  }, [refetchContract]);
 
   return { data, isLoading, isError, refetch };
 }

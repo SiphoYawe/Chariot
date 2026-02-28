@@ -1,7 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { POLLING_INTERVAL_MS } from "@chariot/shared";
+import { useMemo, useCallback } from "react";
+import { useReadContract } from "wagmi";
+import {
+  CollateralManagerABI,
+  CHARIOT_ADDRESSES,
+  POLLING_INTERVAL_MS,
+  STALENESS_THRESHOLD_SECONDS,
+} from "@chariot/shared";
 
 interface ETHUSDPriceData {
   /** ETH price in USD */
@@ -12,64 +18,43 @@ interface ETHUSDPriceData {
   isStale: boolean;
 }
 
-function getMockETHUSDPrice(): ETHUSDPriceData {
-  // Mock price with slight variance
-  const base = 2450;
-  const jitter = (Math.random() - 0.5) * 20;
-  return {
-    price: base + jitter,
-    lastUpdated: Math.floor(Date.now() / 1000),
-    isStale: false,
-  };
-}
+const WAD = BigInt(10) ** BigInt(18);
 
 /**
- * Hook for fetching the current ETH/USD price from Stork oracle.
- * Uses mock data until contracts are deployed.
- *
- * When ABIs are populated, replace with:
- * - useReadContract for StorkOracle.getTemporalNumericValueV1(ETHUSD_FEED_ID)
+ * Hook for fetching the current ETH/USD price from the CollateralManager oracle.
+ * Reads collateralManager.getETHPrice() which returns the price in WAD (18 decimals).
+ * Staleness is determined by comparing the data fetch time against STALENESS_THRESHOLD_SECONDS.
  */
 export function useETHUSDPrice() {
-  const [data, setData] = useState<ETHUSDPriceData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
+  const {
+    data: rawPrice,
+    isLoading,
+    isError,
+    refetch: refetchContract,
+    dataUpdatedAt,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
+    abi: CollateralManagerABI,
+    functionName: "getETHPrice",
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
 
-  useEffect(() => {
-    let active = true;
-    const load = () => {
-      setTimeout(() => {
-        if (!active) return;
-        try {
-          setData(getMockETHUSDPrice());
-          setIsLoading(false);
-        } catch {
-          setIsError(true);
-          setIsLoading(false);
-        }
-      }, 200);
-    };
-    load();
-    const interval = setInterval(load, POLLING_INTERVAL_MS);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, []);
+  const data = useMemo((): ETHUSDPriceData | null => {
+    if (rawPrice === undefined) return null;
+
+    const price = Number(rawPrice) / Number(WAD);
+    const lastUpdated = dataUpdatedAt
+      ? Math.floor(dataUpdatedAt / 1000)
+      : Math.floor(Date.now() / 1000);
+    const now = Math.floor(Date.now() / 1000);
+    const isStale = now - lastUpdated > STALENESS_THRESHOLD_SECONDS;
+
+    return { price, lastUpdated, isStale };
+  }, [rawPrice, dataUpdatedAt]);
 
   const refetch = useCallback(() => {
-    setIsLoading(true);
-    setIsError(false);
-    setTimeout(() => {
-      try {
-        setData(getMockETHUSDPrice());
-        setIsLoading(false);
-      } catch {
-        setIsError(true);
-        setIsLoading(false);
-      }
-    }, 200);
-  }, []);
+    refetchContract();
+  }, [refetchContract]);
 
   return { data, isLoading, isError, refetch };
 }

@@ -23,7 +23,7 @@ export function BorrowRateDisplay({
   className,
 }: BorrowRateDisplayProps) {
   const [expanded, setExpanded] = useState(false);
-  const { data: rateData } = useRateBreakdown(utilisation);
+  const { data: rateData } = useRateBreakdown();
 
   const totalRate = rateData ? rateData.totalRate : borrowRate;
 

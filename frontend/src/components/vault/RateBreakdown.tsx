@@ -20,8 +20,7 @@ function formatPercent(n: number): string {
 export function RateBreakdown({ className }: RateBreakdownProps) {
   const [expanded, setExpanded] = useState(false);
   const { data: vaultData, isLoading: vaultLoading, isError: vaultError, refetch } = useVaultMetrics();
-  const utilisation = vaultData ? vaultData.utilisationRate / 100 : 0.5;
-  const { data: rateData, isLoading: rateLoading } = useRateBreakdown(utilisation);
+  const { data: rateData, isLoading: rateLoading } = useRateBreakdown();
 
   const isLoading = vaultLoading || rateLoading;
   const totalRate = rateData ? rateData.totalRate : (vaultData ? vaultData.borrowRate / 100 : 0);

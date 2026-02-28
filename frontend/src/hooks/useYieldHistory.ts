@@ -52,33 +52,12 @@ function filterByPeriod(data: YieldDataPoint[], period: TimePeriod): YieldDataPo
   return data.filter((d) => d.timestamp >= cutoff);
 }
 
-function generateSeedData(): YieldDataPoint[] {
-  const now = Date.now();
-  const points: YieldDataPoint[] = [];
-  const intervals = 720;
-  const intervalMs = (30 * 24 * 60 * 60 * 1000) / intervals;
-
-  for (let i = 0; i < intervals; i++) {
-    const timestamp = now - (intervals - i) * intervalMs;
-    const progress = i / intervals;
-    const baseEarnings = progress * 250;
-    const noise = Math.sin(i * 0.1) * 5 + Math.cos(i * 0.3) * 3;
-    const earnings = Math.max(0, baseEarnings + noise);
-    const sharePrice = 1.0 + progress * 0.00025 + Math.sin(i * 0.05) * 0.000005;
-    points.push({ timestamp, earnings, sharePrice });
-  }
-
-  return points;
-}
-
 function getInitialSnapshots(): YieldDataPoint[] {
   try {
-    const stored = loadSnapshots();
-    if (stored.length > 0) return stored;
+    return loadSnapshots();
   } catch {
-    // corrupted localStorage -- fall through to seed
+    return [];
   }
-  return generateSeedData();
 }
 
 export function useYieldHistory(period: TimePeriod = "7d") {
@@ -131,7 +110,7 @@ export function useYieldHistory(period: TimePeriod = "7d") {
     setIsError(false);
     try {
       const stored = loadSnapshots();
-      snapshotsRef.current = stored.length > 0 ? stored : generateSeedData();
+      snapshotsRef.current = stored;
       saveSnapshots(snapshotsRef.current);
       setVersion((v) => v + 1);
     } catch {

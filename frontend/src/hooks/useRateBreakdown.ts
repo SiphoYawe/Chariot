@@ -1,7 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { POLLING_INTERVAL_MS, RATE_MODEL } from "@chariot/shared";
+import { useMemo, useCallback } from "react";
+import { useReadContract } from "wagmi";
+import {
+  ChariotVaultABI,
+  LendingPoolABI,
+  InterestRateModelABI,
+  CHARIOT_ADDRESSES,
+  POLLING_INTERVAL_MS,
+} from "@chariot/shared";
 
 interface RateBreakdownData {
   /** Base utilisation rate (0-1) */
@@ -14,78 +21,91 @@ interface RateBreakdownData {
   isPremiumActive: boolean;
 }
 
-function getMockRateBreakdown(utilisation: number): RateBreakdownData {
-  // Calculate base rate from kinked model
-  let baseRate: number;
-  if (utilisation <= RATE_MODEL.U_OPTIMAL) {
-    baseRate = RATE_MODEL.R_BASE + RATE_MODEL.R_SLOPE1 * (utilisation / RATE_MODEL.U_OPTIMAL);
-  } else {
-    baseRate =
-      RATE_MODEL.R_BASE +
-      RATE_MODEL.R_SLOPE1 +
-      RATE_MODEL.R_SLOPE2 *
-        ((utilisation - RATE_MODEL.U_OPTIMAL) / (1 - RATE_MODEL.U_OPTIMAL));
-  }
-
-  // Mock: simulate volatility premium of 5% (vol = 35%, kVol = 0.5, excess = 10%)
-  const volatilityPremium = 0.05;
-  const totalRate = baseRate + volatilityPremium;
-
-  return {
-    baseRate,
-    volatilityPremium,
-    totalRate,
-    isPremiumActive: volatilityPremium > 0,
-  };
-}
+const WAD = BigInt(10) ** BigInt(18);
 
 /**
  * Hook for fetching rate breakdown from InterestRateModel.
- *
- * When ABIs are populated, replace with:
- * - useReadContract for InterestRateModel.getRateBreakdown(utilisation, collateralToken)
- * Poll every 12 seconds (1 Arc block).
+ * First computes utilisation from vault.totalAssets() and lendingPool.getTotalBorrowed(),
+ * then calls interestRateModel.getRateBreakdown(utilisation, BRIDGED_ETH).
  */
-export function useRateBreakdown(utilisation: number = 0.5, _collateralToken?: `0x${string}`) {
-  const [data, setData] = useState<RateBreakdownData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
+export function useRateBreakdown() {
+  // Read totalAssets to compute utilisation
+  const {
+    data: rawTotalAssets,
+    isLoading: loadingAssets,
+    isError: errorAssets,
+    refetch: refetchAssets,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.CHARIOT_VAULT,
+    abi: ChariotVaultABI,
+    functionName: "totalAssets",
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
 
-  useEffect(() => {
-    let active = true;
-    const load = () => {
-      setTimeout(() => {
-        if (!active) return;
-        try {
-          setData(getMockRateBreakdown(utilisation));
-          setIsLoading(false);
-        } catch {
-          setIsError(true);
-          setIsLoading(false);
-        }
-      }, 200);
+  // Read totalBorrowed to compute utilisation
+  const {
+    data: rawTotalBorrowed,
+    isLoading: loadingBorrowed,
+    isError: errorBorrowed,
+    refetch: refetchBorrowed,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.LENDING_POOL,
+    abi: LendingPoolABI,
+    functionName: "getTotalBorrowed",
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
+
+  // Compute utilisation in WAD for on-chain call
+  const utilisationWad = useMemo(() => {
+    if (rawTotalAssets === undefined || rawTotalBorrowed === undefined)
+      return undefined;
+    const totalAssets = rawTotalAssets as bigint;
+    if (totalAssets === BigInt(0)) return BigInt(0);
+    return ((rawTotalBorrowed as bigint) * WAD) / totalAssets;
+  }, [rawTotalAssets, rawTotalBorrowed]);
+
+  // Call getRateBreakdown(utilisation, BRIDGED_ETH) on-chain
+  const {
+    data: rawBreakdown,
+    isLoading: loadingBreakdown,
+    isError: errorBreakdown,
+    refetch: refetchBreakdown,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.INTEREST_RATE_MODEL,
+    abi: InterestRateModelABI,
+    functionName: "getRateBreakdown",
+    args: [utilisationWad!, CHARIOT_ADDRESSES.BRIDGED_ETH],
+    query: {
+      enabled: utilisationWad !== undefined,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
+
+  const isLoading = loadingAssets || loadingBorrowed || loadingBreakdown;
+  const isError = errorAssets || errorBorrowed || errorBreakdown;
+
+  const data = useMemo((): RateBreakdownData | null => {
+    if (rawBreakdown === undefined) return null;
+
+    // getRateBreakdown returns (baseRate, volatilityPremium, totalRate) all in WAD
+    const breakdown = rawBreakdown as readonly [bigint, bigint, bigint];
+    const baseRate = Number(breakdown[0]) / Number(WAD);
+    const volatilityPremium = Number(breakdown[1]) / Number(WAD);
+    const totalRate = Number(breakdown[2]) / Number(WAD);
+
+    return {
+      baseRate,
+      volatilityPremium,
+      totalRate,
+      isPremiumActive: volatilityPremium > 0,
     };
-    load();
-    const interval = setInterval(load, POLLING_INTERVAL_MS);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [utilisation, _collateralToken]);
+  }, [rawBreakdown]);
 
   const refetch = useCallback(() => {
-    setIsLoading(true);
-    setIsError(false);
-    setTimeout(() => {
-      try {
-        setData(getMockRateBreakdown(utilisation));
-        setIsLoading(false);
-      } catch {
-        setIsError(true);
-        setIsLoading(false);
-      }
-    }, 200);
-  }, [utilisation]);
+    refetchAssets();
+    refetchBorrowed();
+    refetchBreakdown();
+  }, [refetchAssets, refetchBorrowed, refetchBreakdown]);
 
   return { data, isLoading, isError, refetch };
 }

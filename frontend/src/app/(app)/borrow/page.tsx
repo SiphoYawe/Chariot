@@ -58,7 +58,7 @@ export default function BorrowPage() {
   const { address, isConnected } = useAccount();
   const collateral = useCollateralData(address);
   const ethPrice = useETHUSDPrice();
-  const position = useUserPosition(address, ethPrice.data?.price);
+  const position = useUserPosition(address);
   const borrowRate = useBorrowRate();
 
   // Track whether user is in deposit flow

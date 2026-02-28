@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useCallback } from "react";
+import { useReadContract, useAccount } from "wagmi";
+import {
+  ChariotVaultABI,
+  CHARIOT_ADDRESSES,
+  POLLING_INTERVAL_MS,
+  USDC_ERC20_DECIMALS,
+} from "@chariot/shared";
 
 interface LenderPositionData {
   /** chUSDC share balance */
@@ -17,78 +24,89 @@ interface LenderPositionData {
   personalAPY: number;
 }
 
+const USDC_DIVISOR = 10 ** USDC_ERC20_DECIMALS;
+
 /**
  * Hook for fetching the lender's position data.
- * Uses mock data with 12s polling until contracts are deployed.
- *
- * When ABIs are populated, replace with:
- * - useReadContract for vault.balanceOf(user), vault.convertToAssets()
- * - useContractEvents for Deposit/Withdraw event logs to track original deposits
+ * Reads vault.balanceOf(user) for share balance and vault.convertToAssets(balance) for position value.
+ * Earnings are calculated as positionValue - shareBalance (since initial deposit is 1:1).
  */
 export function useLenderPosition() {
-  const [data, setData] = useState<LenderPositionData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
+  const { address } = useAccount();
 
-  // Mock: simulate a user with an active position
-  // Set MOCK_HAS_POSITION to false to test EmptyState
-  const MOCK_HAS_POSITION = true;
+  const {
+    data: rawShareBalance,
+    isLoading: loadingBalance,
+    isError: errorBalance,
+    refetch: refetchBalance,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.CHARIOT_VAULT,
+    abi: ChariotVaultABI,
+    functionName: "balanceOf",
+    args: [address!],
+    query: {
+      enabled: !!address,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
 
-  useEffect(() => {
-    let active = true;
+  const {
+    data: rawPositionValue,
+    isLoading: loadingConvert,
+    isError: errorConvert,
+    refetch: refetchConvert,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.CHARIOT_VAULT,
+    abi: ChariotVaultABI,
+    functionName: "convertToAssets",
+    args: [rawShareBalance ?? BigInt(0)],
+    query: {
+      enabled: !!address && rawShareBalance !== undefined,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
 
-    const load = () => {
-      setTimeout(() => {
-        if (!active) return;
-        try {
-          if (!MOCK_HAS_POSITION) {
-            setData(null);
-            setIsLoading(false);
-            return;
-          }
+  const isLoading = !address ? false : loadingBalance || loadingConvert;
+  const isError = errorBalance || errorConvert;
 
-          // Mock position data -- simulates a user who deposited 5,000 USDC
-          // and the share price has appreciated slightly
-          const shareBalance = 5_000;
-          const sharePrice = 1.0023; // Slight appreciation
-          const positionValue = shareBalance * sharePrice;
-          const originalDeposit = 5_000;
-          const accruedEarnings = positionValue - originalDeposit;
+  const data = useMemo((): LenderPositionData | null => {
+    if (!address) return null;
+    if (rawShareBalance === undefined || rawPositionValue === undefined) return null;
 
-          // Annualized APY (mock: 30 days elapsed)
-          const daysElapsed = 30;
-          const returnRate = positionValue / originalDeposit;
-          const personalAPY =
-            (Math.pow(returnRate, 365 / daysElapsed) - 1) * 100;
+    const shareBalance = Number(rawShareBalance) / USDC_DIVISOR;
+    const positionValue = Number(rawPositionValue) / USDC_DIVISOR;
 
-          setData({
-            shareBalance,
-            sharePrice,
-            positionValue,
-            originalDeposit,
-            accruedEarnings,
-            personalAPY,
-          });
-          setIsLoading(false);
-        } catch {
-          setIsError(true);
-          setIsLoading(false);
-        }
-      }, 300);
+    // If user has no shares, return null (no position)
+    if (shareBalance === 0) return null;
+
+    // Share price = positionValue / shareBalance
+    const sharePrice = shareBalance > 0 ? positionValue / shareBalance : 1.0;
+
+    // Original deposit approximation: shares were minted 1:1 at deposit time,
+    // so original deposit ~= shareBalance (in USDC terms)
+    const originalDeposit = shareBalance;
+    const accruedEarnings = positionValue - originalDeposit;
+
+    // Personal APY approximation: based on share price appreciation
+    // Without on-chain deposit timestamp, we estimate conservatively
+    // If sharePrice > 1, there has been yield
+    const personalAPY =
+      sharePrice > 1.0 ? (sharePrice - 1.0) * 365 * 100 : 0;
+
+    return {
+      shareBalance,
+      sharePrice,
+      positionValue,
+      originalDeposit,
+      accruedEarnings,
+      personalAPY,
     };
-
-    load();
-    const interval = setInterval(load, 12_000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [MOCK_HAS_POSITION]);
+  }, [address, rawShareBalance, rawPositionValue]);
 
   const refetch = useCallback(() => {
-    setIsLoading(true);
-    setIsError(false);
-  }, []);
+    refetchBalance();
+    refetchConvert();
+  }, [refetchBalance, refetchConvert]);
 
   return { data, isLoading, isError, hasPosition: !!data, refetch };
 }
