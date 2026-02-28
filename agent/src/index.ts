@@ -5,7 +5,7 @@ import { loadConfig } from "./config.js";
 import { createOrConnectWallet } from "./wallet/circleWallet.js";
 import { validateAddresses } from "./wallet/permissions.js";
 import { runMonitorLoop } from "./monitor/monitorLoop.js";
-import type { ScoredAction } from "./decision/utilityCalculator.js";
+import { RebalanceExecutor } from "./execution/rebalanceExecutor.js";
 import { log } from "./logger.js";
 
 async function main() {
@@ -26,18 +26,15 @@ async function main() {
     walletAddress: wallet.walletAddress,
   });
 
-  // Placeholder executeAction -- will be replaced by rebalanceExecutor in Story 7-3
-  const executeAction = async (action: ScoredAction, emergency: boolean): Promise<void> => {
-    log("info", "action_pending_executor", {
-      type: action.type,
-      amount: action.amount.toString(),
-      emergency,
-      note: "Execution module pending Story 7-3",
-    });
-  };
+  // Create the rebalance executor with rate limiting
+  const executor = new RebalanceExecutor(wallet, config.maxRebalancesPerDay);
 
-  // Start monitoring loop
-  await runMonitorLoop({ config, wallet, executeAction });
+  // Start monitoring loop with real executor
+  await runMonitorLoop({
+    config,
+    wallet,
+    executeAction: (action, emergency) => executor.execute(action, emergency),
+  });
 }
 
 main().catch((error) => {

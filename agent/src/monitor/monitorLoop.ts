@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs";
 import type { AgentConfig } from "../config.js";
 import type { CircleWallet } from "../wallet/circleWallet.js";
 import { readOnChainState } from "./vaultMonitor.js";
@@ -5,6 +6,8 @@ import { getCircuitBreakerLevel, isEmergency } from "./circuitBreakerMonitor.js"
 import { rankActions, type ScoredAction } from "../decision/utilityCalculator.js";
 import { selectBestAction } from "../decision/decisionEngine.js";
 import { log } from "../logger.js";
+
+const HEARTBEAT_PATH = "/tmp/chariot-heartbeat";
 
 export interface MonitorContext {
   config: AgentConfig;
@@ -61,6 +64,12 @@ export async function runMonitorLoop(ctx: MonitorContext): Promise<void> {
         if (bestAction.type !== "do_nothing") {
           await ctx.executeAction(bestAction, false);
         }
+      }
+      // Write heartbeat after each successful cycle
+      try {
+        writeFileSync(HEARTBEAT_PATH, String(Date.now()));
+      } catch {
+        // Heartbeat file write failure is non-critical
       }
     } catch (error) {
       log("error", "monitor_cycle_error", {}, error);
