@@ -573,9 +573,9 @@ export default function LendPage() {
         />
       ) : (
         <>
-          {/* Main 2-column layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,440px)] gap-8">
-            {/* Left column -- Info & Charts */}
+          {/* Top 2-column layout: Position + Action Panel */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,400px)] gap-8">
+            {/* Left column -- Position info */}
             <div className="space-y-6">
               {/* Earnings & Share Price side-by-side */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -585,20 +585,11 @@ export default function LendPage() {
 
               {/* Lender position */}
               <LenderPositionSection />
-
-              {/* Charts */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <YieldHistoryChart />
-                <SharePriceChart />
-              </div>
-
-              {/* Utilisation */}
-              <UtilisationBar />
             </div>
 
             {/* Right column -- Action Panel */}
             <div>
-              <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6 sticky top-6">
+              <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6 sticky top-6 overflow-hidden">
                 <Tabs defaultValue="deposit">
                   <TabsList
                     variant="line"
@@ -628,6 +619,16 @@ export default function LendPage() {
                 </Tabs>
               </div>
             </div>
+          </div>
+
+          {/* Full-width section: Charts & Utilisation */}
+          <div className="mt-8 space-y-6">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <YieldHistoryChart />
+              <SharePriceChart />
+            </div>
+
+            <UtilisationBar />
           </div>
         </>
       )}
