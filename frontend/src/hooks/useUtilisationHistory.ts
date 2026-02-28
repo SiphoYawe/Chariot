@@ -3,6 +3,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useVaultMetrics } from "./useVaultMetrics";
 import { type TimePeriod, PERIOD_CUTOFFS, MIN_SNAPSHOT_INTERVAL_MS } from "@/types/charts";
+import {
+  generateSeedData,
+  MIN_SNAPSHOTS_FOR_CHART,
+  SEED_SPANS,
+  SEED_COUNTS,
+} from "@/lib/chartSeed";
 
 export type { TimePeriod };
 
@@ -53,36 +59,38 @@ function filterByPeriod(data: UtilisationDataPoint[], period: TimePeriod): Utili
   return data.filter((d) => d.timestamp >= cutoff);
 }
 
-function getInitialSnapshots(): UtilisationDataPoint[] {
-  try {
-    return loadSnapshots();
-  } catch {
-    return [];
-  }
+function buildSeed(currentUtil: number, period: TimePeriod): UtilisationDataPoint[] {
+  const seed = generateSeedData({
+    count: SEED_COUNTS[period] ?? 28,
+    spanMs: SEED_SPANS[period] ?? SEED_SPANS["7d"],
+    endValue: currentUtil,
+    startValue: Math.max(0, currentUtil * 0.7),
+    noise: 0.08,
+    seed: 101,
+  });
+  return seed.map((p) => ({
+    timestamp: p.timestamp,
+    utilisation: Math.min(100, Math.max(0, p.value)),
+  }));
 }
 
 export function useUtilisationHistory(period: TimePeriod = "7d") {
   const [version, setVersion] = useState(0);
   const [isError, setIsError] = useState(false);
-  const snapshotsRef = useRef<UtilisationDataPoint[] | null>(null);
+  const snapshotsRef = useRef<UtilisationDataPoint[]>([]);
+  const initializedRef = useRef(false);
 
   const { data: metrics } = useVaultMetrics();
 
-  // Lazy-initialize via state initializer pattern (safe for concurrent mode)
-  if (snapshotsRef.current === null && typeof window !== "undefined") {
-    snapshotsRef.current = getInitialSnapshots();
+  // Lazy-initialize from localStorage
+  if (!initializedRef.current && typeof window !== "undefined") {
+    snapshotsRef.current = loadSnapshots();
+    initializedRef.current = true;
   }
-
-  // Persist seed data on mount
-  useEffect(() => {
-    if (snapshotsRef.current && snapshotsRef.current.length > 0) {
-      saveSnapshots(snapshotsRef.current);
-    }
-  }, []);
 
   // Record new snapshots on each poll cycle
   useEffect(() => {
-    if (!metrics || !snapshotsRef.current) return;
+    if (!metrics) return;
 
     const snapshot: UtilisationDataPoint = {
       timestamp: Date.now(),
@@ -98,24 +106,24 @@ export function useUtilisationHistory(period: TimePeriod = "7d") {
   }, [metrics]);
 
   const data = useMemo(() => {
-    if (!snapshotsRef.current) return [];
-    return filterByPeriod(snapshotsRef.current, period);
+    const filtered = filterByPeriod(snapshotsRef.current, period);
+    // If too few real data points, generate seed data from current value
+    if (filtered.length < MIN_SNAPSHOTS_FOR_CHART && metrics) {
+      return buildSeed(metrics.utilisationRate, period);
+    }
+    return filtered;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, version]);
-
-  const isLoading = snapshotsRef.current === null;
+  }, [period, version, metrics]);
 
   const refetch = useCallback(() => {
     setIsError(false);
     try {
-      const stored = loadSnapshots();
-      snapshotsRef.current = stored;
-      saveSnapshots(snapshotsRef.current);
+      snapshotsRef.current = loadSnapshots();
       setVersion((v) => v + 1);
     } catch {
       setIsError(true);
     }
   }, []);
 
-  return { data, isLoading, isError, refetch };
+  return { data, isLoading: false, isError, refetch };
 }

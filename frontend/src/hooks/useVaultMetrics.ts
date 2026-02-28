@@ -63,11 +63,25 @@ export function useVaultMetrics() {
     query: { refetchInterval: POLLING_INTERVAL_MS },
   });
 
-  const isLoading = loadingAssets || loadingLent || loadingBorrowed;
-  const isError = errorAssets || errorLent || errorBorrowed;
+  // Read real share price via convertToAssets(1e6) / 1e6
+  const {
+    data: rawAssetsPerShare,
+    isLoading: loadingSharePrice,
+    isError: errorSharePrice,
+    refetch: refetchSharePrice,
+  } = useReadContract({
+    address: CHARIOT_ADDRESSES.CHARIOT_VAULT,
+    abi: ChariotVaultABI,
+    functionName: "convertToAssets",
+    args: [BigInt(10 ** USDC_ERC20_DECIMALS)],
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
+
+  const isLoading = loadingAssets || loadingLent || loadingBorrowed || loadingSharePrice;
+  const isError = errorAssets || errorLent || errorBorrowed || errorSharePrice;
 
   const data = useMemo((): VaultMetricsData | null => {
-    if (rawTotalAssets === undefined || rawTotalLent === undefined || rawTotalBorrowed === undefined) {
+    if (rawTotalAssets === undefined || rawTotalLent === undefined || rawTotalBorrowed === undefined || rawAssetsPerShare === undefined) {
       return null;
     }
 
@@ -108,10 +122,8 @@ export function useVaultMetrics() {
       (1 - RATE_MODEL.STRATEGY_FEE);
     const supplyAPY = borrowComponent + tbillComponent;
 
-    // Share price: for a fresh vault with no yield yet, it's 1.0
-    // In reality share price = totalAssets / totalSupply, but we don't have totalSupply here
-    // We use 1.0 as a reasonable default -- the real share price is convertToAssets(1e6) / 1e6
-    const sharePrice = 1.0;
+    // Real share price from convertToAssets(1e6) / 1e6
+    const sharePrice = Number(rawAssetsPerShare) / USDC_DIVISOR;
 
     return {
       totalAssets,
@@ -125,13 +137,14 @@ export function useVaultMetrics() {
       tbillYieldComponent: tbillComponent * 100,
       borrowInterestComponent: borrowComponent * 100,
     };
-  }, [rawTotalAssets, rawTotalLent, rawTotalBorrowed]);
+  }, [rawTotalAssets, rawTotalLent, rawTotalBorrowed, rawAssetsPerShare]);
 
   const refetch = useCallback(() => {
     refetchAssets();
     refetchLent();
     refetchBorrowed();
-  }, [refetchAssets, refetchLent, refetchBorrowed]);
+    refetchSharePrice();
+  }, [refetchAssets, refetchLent, refetchBorrowed, refetchSharePrice]);
 
   return { data, isLoading, isError, refetch };
 }

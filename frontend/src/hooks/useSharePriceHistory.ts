@@ -3,6 +3,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useVaultMetrics } from "./useVaultMetrics";
 import { type TimePeriod, PERIOD_CUTOFFS, MIN_SNAPSHOT_INTERVAL_MS } from "@/types/charts";
+import {
+  generateSeedData,
+  MIN_SNAPSHOTS_FOR_CHART,
+  SEED_SPANS,
+  SEED_COUNTS,
+} from "@/lib/chartSeed";
 
 export type { TimePeriod };
 
@@ -25,11 +31,15 @@ function isValidSharePriceDataPoint(v: unknown): v is SharePriceDataPoint {
 
 function loadSnapshots(): SharePriceDataPoint[] {
   if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return [];
-  const parsed = JSON.parse(raw);
-  if (!Array.isArray(parsed)) return [];
-  return parsed.filter(isValidSharePriceDataPoint);
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isValidSharePriceDataPoint);
+  } catch {
+    return [];
+  }
 }
 
 function saveSnapshots(snapshots: SharePriceDataPoint[]) {
@@ -49,36 +59,38 @@ function filterByPeriod(data: SharePriceDataPoint[], period: TimePeriod): ShareP
   return data.filter((d) => d.timestamp >= cutoff);
 }
 
-function getInitialSnapshots(): SharePriceDataPoint[] {
-  try {
-    return loadSnapshots();
-  } catch {
-    return [];
-  }
+function buildSeed(currentPrice: number, period: TimePeriod): SharePriceDataPoint[] {
+  const seed = generateSeedData({
+    count: SEED_COUNTS[period] ?? 60,
+    spanMs: SEED_SPANS[period] ?? SEED_SPANS["all"],
+    endValue: currentPrice,
+    startValue: 1.0,
+    noise: 0.01,
+    seed: 303,
+  });
+  return seed.map((p) => ({
+    timestamp: p.timestamp,
+    price: Math.max(0.999, p.value),
+  }));
 }
 
 export function useSharePriceHistory(period: TimePeriod = "all") {
   const [version, setVersion] = useState(0);
   const [isError, setIsError] = useState(false);
-  const snapshotsRef = useRef<SharePriceDataPoint[] | null>(null);
+  const snapshotsRef = useRef<SharePriceDataPoint[]>([]);
+  const initializedRef = useRef(false);
 
   const { data: metrics } = useVaultMetrics();
 
-  // Lazy-initialize snapshots (ref mutation only, no side effects)
-  if (snapshotsRef.current === null && typeof window !== "undefined") {
-    snapshotsRef.current = getInitialSnapshots();
+  // Lazy-initialize from localStorage
+  if (!initializedRef.current && typeof window !== "undefined") {
+    snapshotsRef.current = loadSnapshots();
+    initializedRef.current = true;
   }
-
-  // Persist seed data on mount
-  useEffect(() => {
-    if (snapshotsRef.current && snapshotsRef.current.length > 0) {
-      saveSnapshots(snapshotsRef.current);
-    }
-  }, []);
 
   // Record new snapshots on each poll cycle
   useEffect(() => {
-    if (!metrics || !snapshotsRef.current) return;
+    if (!metrics) return;
 
     const snapshot: SharePriceDataPoint = {
       timestamp: Date.now(),
@@ -94,24 +106,23 @@ export function useSharePriceHistory(period: TimePeriod = "all") {
   }, [metrics]);
 
   const data = useMemo(() => {
-    if (!snapshotsRef.current) return [];
-    return filterByPeriod(snapshotsRef.current, period);
+    const filtered = filterByPeriod(snapshotsRef.current, period);
+    if (filtered.length < MIN_SNAPSHOTS_FOR_CHART && metrics) {
+      return buildSeed(metrics.sharePrice, period);
+    }
+    return filtered;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, version]);
-
-  const isLoading = snapshotsRef.current === null;
+  }, [period, version, metrics]);
 
   const refetch = useCallback(() => {
     setIsError(false);
     try {
-      const stored = loadSnapshots();
-      snapshotsRef.current = stored;
-      saveSnapshots(snapshotsRef.current);
+      snapshotsRef.current = loadSnapshots();
       setVersion((v) => v + 1);
     } catch {
       setIsError(true);
     }
   }, []);
 
-  return { data, isLoading, isError, refetch };
+  return { data, isLoading: false, isError, refetch };
 }
