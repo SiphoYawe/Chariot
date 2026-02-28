@@ -67,7 +67,7 @@ export function AmountInput({
   return (
     <div className="space-y-2">
       <div
-        className={`border bg-[#F8FAFA] p-5 transition-colors ${
+        className={`border bg-white p-5 transition-colors ${
           hasError
             ? "border-[#F59E0B]"
             : "border-[rgba(3,121,113,0.15)] focus-within:border-[#03B5AA]"
