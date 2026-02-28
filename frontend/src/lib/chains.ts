@@ -10,13 +10,18 @@ export const arcTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: [process.env.NEXT_PUBLIC_ARC_RPC_URL || "https://testnet-rpc.arc.xyz"],
+      http: [process.env.NEXT_PUBLIC_ARC_RPC_URL || "https://rpc.testnet.arc.network"],
     },
   },
   blockExplorers: {
     default: {
-      name: "Arc Explorer",
-      url: "https://testnet-explorer.arc.xyz",
+      name: "ArcScan",
+      url: "https://testnet.arcscan.app",
+    },
+  },
+  contracts: {
+    multicall3: {
+      address: "0xcA11bde05977b3631167028862bE2a173976CA11",
     },
   },
   testnet: true,
