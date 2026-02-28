@@ -119,14 +119,20 @@ contract LiquidationEngineTest is Test {
         stork.setPriceNow(ETHUSD_FEED_ID, int192(int256(1800e18)));
     }
 
+    /// @notice Helper to calculate the expected scaled bonus WAD for a given HF
+    function _expectedBonusWad(uint256 healthFactor) internal view returns (uint256) {
+        uint256 bonusBps = liquidationEngine.calculateLiquidationBonus(healthFactor);
+        return bonusBps * 1e14;
+    }
+
     // ================================================================
-    // Core Liquidation Tests (AC: 1, 2, 3)
+    // Core Liquidation Tests
     // ================================================================
 
     function test_liquidate_succeedsWhenHFBelowOne() public {
         _makeAliceLiquidatable();
 
-        uint256 debtToRepay = 2000 * USDC_UNIT; // Repay $2000 of alice's debt
+        uint256 debtToRepay = 2000 * USDC_UNIT;
         uint256 bobUsdcBefore = usdc.balanceOf(bob);
         uint256 bobETHBefore = bridgedETH.balanceOf(bob);
 
@@ -143,15 +149,16 @@ contract LiquidationEngineTest is Test {
         assertTrue(pool.getUserDebt(alice) < 7500 * USDC_UNIT);
     }
 
-    function test_liquidate_correctCollateralSeized() public {
+    function test_liquidate_correctCollateralSeizedWithScaledBonus() public {
         _makeAliceLiquidatable();
 
-        // At $1800/ETH, repaying $2000 USDC
-        // seizable = ($2000 / $1800) * 1.05 = 1.1111 * 1.05 = 1.16667 ETH
+        // At $1800/ETH, HF = 0.984e18
+        // Scaled bonus: 500 + min(500, (0.016e18 * 50 / 1e16)) = 500 + 80 = 580 BPS = 5.8%
         uint256 debtToRepay = 2000 * USDC_UNIT;
-        uint256 debtToRepayWad = uint256(2000e18);
-        uint256 ethPrice = uint256(1800e18);
-        uint256 expectedSeizure = liquidationEngine.calculateSeizableCollateral(debtToRepayWad, ethPrice, 5e16);
+        uint256 hf = 984e15; // 0.984e18
+        uint256 bonusWad = _expectedBonusWad(hf);
+        uint256 expectedSeizure =
+            liquidationEngine.calculateSeizableCollateral(uint256(2000e18), uint256(1800e18), bonusWad);
 
         uint256 bobETHBefore = bridgedETH.balanceOf(bob);
 
@@ -175,14 +182,16 @@ contract LiquidationEngineTest is Test {
         assertEq(debtBefore - debtAfter, debtToRepay);
     }
 
-    function test_liquidate_with5PercentBonus() public {
+    function test_liquidate_usesScaledBonusNotStatic() public {
         _makeAliceLiquidatable();
 
         uint256 debtToRepay = 1000 * USDC_UNIT;
-        // At $1800: base collateral = 1000/1800 = 0.5556 ETH
-        // With 5% bonus = 0.5556 * 1.05 = 0.58333 ETH
+        // At $1800: HF = 0.984, scaled bonus = 580 BPS (5.8%)
+        // base collateral = 1000/1800 = 0.5556 ETH
+        // With 5.8% bonus = 0.5556 * 1.058 = 0.5878 ETH
+        uint256 bonusWad = 580 * 1e14; // 5.8%
         uint256 baseCollateral = (uint256(1000e18) * WAD) / uint256(1800e18);
-        uint256 expectedWithBonus = (baseCollateral * (WAD + 5e16)) / WAD;
+        uint256 expectedWithBonus = (baseCollateral * (WAD + bonusWad)) / WAD;
 
         uint256 bobETHBefore = bridgedETH.balanceOf(bob);
 
@@ -194,7 +203,172 @@ contract LiquidationEngineTest is Test {
     }
 
     // ================================================================
-    // Revert Tests (AC: 6)
+    // Scaled Liquidation Bonus Calculation Tests (AC: 1, 2, 3, 4, 5)
+    // ================================================================
+
+    /// @notice AC2: HF = 0.99 -> bonus = 5% base + 0.5% depth = 5.5% (550 BPS)
+    function test_calculateLiquidationBonus_HF099() public view {
+        uint256 bonusBps = liquidationEngine.calculateLiquidationBonus(0.99e18);
+        // depthBps = (0.01e18 * 50) / 1e16 = 50
+        // total = 500 + 50 = 550
+        assertEq(bonusBps, 550);
+    }
+
+    /// @notice AC3: HF = 0.95 -> bonus = 5% base + 2.5% depth = 7.5% (750 BPS)
+    function test_calculateLiquidationBonus_HF095() public view {
+        uint256 bonusBps = liquidationEngine.calculateLiquidationBonus(0.95e18);
+        // depthBps = (0.05e18 * 50) / 1e16 = 250
+        // total = 500 + 250 = 750
+        assertEq(bonusBps, 750);
+    }
+
+    /// @notice AC4: HF = 0.85 -> bonus = 5% base + 5% depth (capped) = 10% (1000 BPS)
+    function test_calculateLiquidationBonus_HF085() public view {
+        uint256 bonusBps = liquidationEngine.calculateLiquidationBonus(0.85e18);
+        // depthBps = (0.15e18 * 50) / 1e16 = 750, capped at 500
+        // total = 500 + 500 = 1000
+        assertEq(bonusBps, 1000);
+    }
+
+    /// @notice HF = 0.50 (deeply underwater) -> bonus capped at 10% (1000 BPS)
+    function test_calculateLiquidationBonus_HF050_capped() public view {
+        uint256 bonusBps = liquidationEngine.calculateLiquidationBonus(0.5e18);
+        // depthBps = (0.50e18 * 50) / 1e16 = 2500, capped at 500
+        // total = 500 + 500 = 1000
+        assertEq(bonusBps, 1000);
+    }
+
+    /// @notice AC5: HF = 1.0 -> reverts (position is healthy)
+    function test_calculateLiquidationBonus_revertsAtHF100() public {
+        vm.expectRevert(ILiquidationEngine.PositionNotLiquidatable.selector);
+        liquidationEngine.calculateLiquidationBonus(1e18);
+    }
+
+    /// @notice AC5: HF = 1.5 -> reverts (position is healthy)
+    function test_calculateLiquidationBonus_revertsAtHF150() public {
+        vm.expectRevert(ILiquidationEngine.PositionNotLiquidatable.selector);
+        liquidationEngine.calculateLiquidationBonus(1.5e18);
+    }
+
+    // ================================================================
+    // Admin Configuration Tests (AC: 6)
+    // ================================================================
+
+    function test_admin_canUpdateBaseBonusBps() public {
+        vm.prank(admin);
+        liquidationEngine.setBaseBonusBps(300);
+        assertEq(liquidationEngine.baseBonusBps(), 300);
+    }
+
+    function test_admin_canUpdateMaxDepthBonusBps() public {
+        vm.prank(admin);
+        liquidationEngine.setMaxDepthBonusBps(700);
+        assertEq(liquidationEngine.maxDepthBonusBps(), 700);
+    }
+
+    function test_admin_canUpdateDepthScalingFactor() public {
+        vm.prank(admin);
+        liquidationEngine.setDepthScalingFactor(100);
+        assertEq(liquidationEngine.depthScalingFactor(), 100);
+    }
+
+    function test_admin_cannotSetCombinedBonusAbove20Percent() public {
+        // base=500, try to set maxDepth=1600 -> 500+1600=2100 > 2000
+        vm.prank(admin);
+        vm.expectRevert(ILiquidationEngine.InvalidBonusParams.selector);
+        liquidationEngine.setMaxDepthBonusBps(1600);
+
+        // Set base to 1500 first
+        vm.prank(admin);
+        liquidationEngine.setBaseBonusBps(1500);
+
+        // Try to set maxDepth=600 -> 1500+600=2100 > 2000
+        vm.prank(admin);
+        vm.expectRevert(ILiquidationEngine.InvalidBonusParams.selector);
+        liquidationEngine.setMaxDepthBonusBps(600);
+    }
+
+    function test_admin_canSetCombinedBonusExactly20Percent() public {
+        vm.prank(admin);
+        liquidationEngine.setBaseBonusBps(1000);
+
+        vm.prank(admin);
+        liquidationEngine.setMaxDepthBonusBps(1000);
+
+        assertEq(liquidationEngine.baseBonusBps(), 1000);
+        assertEq(liquidationEngine.maxDepthBonusBps(), 1000);
+    }
+
+    function test_admin_emitsLiquidationBonusParamsUpdated() public {
+        vm.expectEmit(false, false, false, true);
+        emit ILiquidationEngine.LiquidationBonusParamsUpdated(300, 500, 50);
+
+        vm.prank(admin);
+        liquidationEngine.setBaseBonusBps(300);
+    }
+
+    function test_nonAdmin_cannotUpdateBonusParams() public {
+        vm.prank(bob);
+        vm.expectRevert();
+        liquidationEngine.setBaseBonusBps(300);
+    }
+
+    // ================================================================
+    // Liquidation Flow Uses Scaled Bonus (AC: 1)
+    // ================================================================
+
+    function test_liquidate_bonusIncreasesWithDeeperUnderwaterPosition() public {
+        // Alice borrows max
+        vm.prank(alice);
+        pool.borrow(address(bridgedETH), 7500 * USDC_UNIT, emptyUpdates);
+
+        // Case 1: Barely liquidatable at $1800 -> HF ~0.984
+        stork.setPriceNow(ETHUSD_FEED_ID, int192(int256(1800e18)));
+
+        uint256 bobETHBefore = bridgedETH.balanceOf(bob);
+        vm.prank(bob);
+        liquidationEngine.liquidate(alice, address(bridgedETH), 1000 * USDC_UNIT, emptyUpdates);
+        uint256 seized1 = bridgedETH.balanceOf(bob) - bobETHBefore;
+
+        // Case 2: Deeper underwater at $1500 -> HF ~0.82
+        // Need new borrower (charlie) for clean test
+        address charlie = makeAddr("charlie");
+        vm.prank(relayer);
+        bridgedETH.mint(charlie, 5 ether, 1);
+        vm.startPrank(charlie);
+        bridgedETH.approve(address(collateralManager), type(uint256).max);
+        collateralManager.depositCollateral(address(bridgedETH), 5 ether);
+        vm.stopPrank();
+
+        // Reset price for borrowing
+        stork.setPriceNow(ETHUSD_FEED_ID, int192(int256(2000e18)));
+        vm.prank(charlie);
+        pool.borrow(address(bridgedETH), 7500 * USDC_UNIT, emptyUpdates);
+
+        // Drop to $1500 for deeper underwater
+        stork.setPriceNow(ETHUSD_FEED_ID, int192(int256(1500e18)));
+
+        address carol = makeAddr("carol");
+        usdc.mint(carol, 500_000 * USDC_UNIT);
+        vm.prank(carol);
+        usdc.approve(address(liquidationEngine), type(uint256).max);
+
+        uint256 carolETHBefore = bridgedETH.balanceOf(carol);
+        vm.prank(carol);
+        liquidationEngine.liquidate(charlie, address(bridgedETH), 1000 * USDC_UNIT, emptyUpdates);
+        uint256 seized2 = bridgedETH.balanceOf(carol) - carolETHBefore;
+
+        // Deeper position gets MORE collateral per dollar of debt (higher bonus)
+        // seized2 normalized by price should show higher bonus than seized1
+        // At $1800: seized1 / (1000/1800) = bonus factor
+        // At $1500: seized2 / (1000/1500) = bonus factor
+        uint256 bonusFactor1 = (seized1 * uint256(1800e18)) / (uint256(1000e18));
+        uint256 bonusFactor2 = (seized2 * uint256(1500e18)) / (uint256(1000e18));
+        assertTrue(bonusFactor2 > bonusFactor1, "Deeper position should get higher bonus");
+    }
+
+    // ================================================================
+    // Revert Tests
     // ================================================================
 
     function test_liquidate_revertsWhenHFAboveOne() public {
@@ -227,7 +401,7 @@ contract LiquidationEngineTest is Test {
     }
 
     // ================================================================
-    // Partial Liquidation / Max Ratio Tests (AC: 2)
+    // Partial Liquidation / Max Ratio Tests
     // ================================================================
 
     function test_liquidate_revertsExceedsMaxLiquidation() public {
@@ -252,7 +426,7 @@ contract LiquidationEngineTest is Test {
     }
 
     // ================================================================
-    // Liquidation Threshold Tests (AC: 4)
+    // Liquidation Threshold Tests
     // ================================================================
 
     function test_getLiquidationThreshold_returns82Percent() public view {
@@ -261,13 +435,14 @@ contract LiquidationEngineTest is Test {
         assertEq(threshold, 82e16);
     }
 
-    function test_getLiquidationBonus_returns5Percent() public view {
+    function test_getLiquidationBonus_returnsBaseBonusInWad() public view {
+        // Base bonus = 500 BPS = 5e16 WAD
         uint256 bonus = liquidationEngine.getLiquidationBonus(address(bridgedETH));
         assertEq(bonus, 5e16);
     }
 
     // ================================================================
-    // Oracle Integration Tests (AC: 5)
+    // Oracle Integration Tests
     // ================================================================
 
     function test_liquidate_usesUpdatedOraclePrice() public {
@@ -302,26 +477,29 @@ contract LiquidationEngineTest is Test {
     }
 
     // ================================================================
-    // Event Emission Tests (AC: 1)
+    // Event Emission Tests
     // ================================================================
 
-    function test_liquidate_emitsPositionLiquidated() public {
+    function test_liquidate_emitsPositionLiquidatedWithScaledBonus() public {
         _makeAliceLiquidatable();
 
         uint256 debtToRepay = 2000 * USDC_UNIT;
-        uint256 bonus = liquidationEngine.LIQUIDATION_BONUS();
+        // HF = 0.984e18 -> bonusBps = 580 -> bonusWad = 580 * 1e14 = 5.8e16
+        uint256 bonusWad = _expectedBonusWad(984e15);
         uint256 expectedSeizure =
-            liquidationEngine.calculateSeizableCollateral(uint256(2000e18), uint256(1800e18), bonus);
+            liquidationEngine.calculateSeizableCollateral(uint256(2000e18), uint256(1800e18), bonusWad);
 
         vm.expectEmit(true, true, true, true);
-        emit ILiquidationEngine.PositionLiquidated(alice, bob, address(bridgedETH), debtToRepay, expectedSeizure, bonus);
+        emit ILiquidationEngine.PositionLiquidated(
+            alice, bob, address(bridgedETH), debtToRepay, expectedSeizure, bonusWad
+        );
 
         vm.prank(bob);
         liquidationEngine.liquidate(alice, address(bridgedETH), debtToRepay, emptyUpdates);
     }
 
     // ================================================================
-    // Seizure Math Tests (AC: 2, 3)
+    // Seizure Math Tests
     // ================================================================
 
     function test_calculateSeizableCollateral_basicMath() public view {
@@ -343,7 +521,7 @@ contract LiquidationEngineTest is Test {
     }
 
     // ================================================================
-    // isLiquidatable View Tests (AC: 6)
+    // isLiquidatable View Tests
     // ================================================================
 
     function test_isLiquidatable_falseWhenHealthy() public {
@@ -363,7 +541,7 @@ contract LiquidationEngineTest is Test {
     }
 
     // ================================================================
-    // Liquidator Receives Correct BridgedETH (AC: 2, 3)
+    // Liquidator Receives Correct BridgedETH
     // ================================================================
 
     function test_liquidate_liquidatorReceivesBridgedETH() public {
@@ -378,7 +556,7 @@ contract LiquidationEngineTest is Test {
     }
 
     // ================================================================
-    // Gas Usage Test (AC: 7)
+    // Gas Usage Test
     // ================================================================
 
     function test_liquidate_gasWithinLimits() public {
@@ -394,7 +572,7 @@ contract LiquidationEngineTest is Test {
     }
 
     // ================================================================
-    // Edge Case: Insufficient Collateral for Seizure (L4)
+    // Edge Case: Insufficient Collateral for Seizure
     // ================================================================
 
     function test_liquidate_revertsInsufficientCollateralForSeizure() public {
@@ -404,7 +582,7 @@ contract LiquidationEngineTest is Test {
 
         // Drop price to $200 -- Alice has 5 ETH = $1000, debt = $7500
         // Max repayable = 50% * $7500 = $3750
-        // Seizure = ($3750 / $200) * 1.05 = 19.6875 ETH > 5 ETH
+        // Seizure = ($3750 / $200) * bonus > 5 ETH
         stork.setPriceNow(ETHUSD_FEED_ID, int192(int256(200e18)));
 
         vm.prank(bob);
@@ -413,7 +591,7 @@ contract LiquidationEngineTest is Test {
     }
 
     // ================================================================
-    // Edge Case: isLiquidatable with stale oracle returns false (C2 fix)
+    // Edge Case: isLiquidatable with stale oracle returns false
     // ================================================================
 
     function test_isLiquidatable_falseWhenOracleStale() public {
@@ -428,7 +606,7 @@ contract LiquidationEngineTest is Test {
     }
 
     // ================================================================
-    // Fuzz Tests (L6)
+    // Fuzz Tests
     // ================================================================
 
     function testFuzz_calculateSeizableCollateral_noOverflow(uint256 debt, uint256 price) public view {
@@ -441,5 +619,18 @@ contract LiquidationEngineTest is Test {
         // Seizure should always be >= debt/price (with bonus)
         uint256 baseResult = (debt * WAD) / price;
         assertTrue(result >= baseResult);
+    }
+
+    /// @notice Fuzz: random HF values produce valid bonuses within [baseBps, baseBps + maxDepthBps]
+    function testFuzz_calculateLiquidationBonus_validRange(uint256 healthFactor) public view {
+        // HF must be in (0, 1e18) exclusive for valid liquidation
+        healthFactor = bound(healthFactor, 1, WAD - 1);
+
+        uint256 bonusBps = liquidationEngine.calculateLiquidationBonus(healthFactor);
+        uint256 baseBps = liquidationEngine.baseBonusBps();
+        uint256 maxDepthBps = liquidationEngine.maxDepthBonusBps();
+
+        assertTrue(bonusBps >= baseBps, "Bonus must be >= base");
+        assertTrue(bonusBps <= baseBps + maxDepthBps, "Bonus must be <= base + maxDepth");
     }
 }

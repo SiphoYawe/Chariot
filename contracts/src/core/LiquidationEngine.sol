@@ -13,16 +13,21 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {StorkStructs} from "@stork-oracle/StorkStructs.sol";
 
 /// @title LiquidationEngine -- Core liquidation logic for undercollateralized positions
-/// @notice Allows liquidators to repay borrower debt and seize collateral with a 5% bonus
+/// @notice Allows liquidators to repay borrower debt and seize collateral with a scaled depth bonus
 /// @dev Extends ChariotBase for access control and reentrancy protection
 contract LiquidationEngine is ChariotBase, ILiquidationEngine {
     using SafeERC20 for IERC20;
 
     // -- Constants --
     uint256 public constant WAD = 1e18;
-    uint256 public constant LIQUIDATION_BONUS = 5e16; // 5% fixed for MVP
     uint256 public constant LIQUIDATION_THRESHOLD_BUFFER = 7e16; // 7%
     uint256 public constant MAX_LIQUIDATION_RATIO = 50e16; // 50% max debt repayable per liquidation
+    uint256 public constant MAX_TOTAL_BONUS_BPS = 2000; // 20% max combined bonus
+
+    // -- Scaled Bonus Parameters --
+    uint256 private _baseBonusBps; // Base liquidation bonus in BPS (default: 500 = 5%)
+    uint256 private _maxDepthBonusBps; // Max depth bonus in BPS (default: 500 = 5% cap)
+    uint256 private _depthScalingFactor; // Depth multiplier (default: 50)
 
     // -- Dependencies --
     ILendingPool private _lendingPool;
@@ -33,6 +38,7 @@ contract LiquidationEngine is ChariotBase, ILiquidationEngine {
     struct LiquidationParams {
         uint256 borrowerDebt;
         uint256 seizureAmount;
+        uint256 bonusWad;
     }
 
     // -- Constructor --
@@ -41,6 +47,11 @@ contract LiquidationEngine is ChariotBase, ILiquidationEngine {
 
         _usdc = IERC20(usdc_);
         storkOracle = storkOracle_;
+
+        // Initialize scaled bonus parameters
+        _baseBonusBps = 500; // 5%
+        _maxDepthBonusBps = 500; // 5% cap
+        _depthScalingFactor = 50;
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin_);
     }
@@ -72,8 +83,18 @@ contract LiquidationEngine is ChariotBase, ILiquidationEngine {
 
         // 4. Emit event
         emit PositionLiquidated(
-            borrower, msg.sender, collateralToken, debtToRepay, params.seizureAmount, LIQUIDATION_BONUS
+            borrower, msg.sender, collateralToken, debtToRepay, params.seizureAmount, params.bonusWad
         );
+    }
+
+    /// @notice Calculate the scaled liquidation bonus based on health factor depth
+    /// @param healthFactor The borrower's health factor in WAD (18 decimals)
+    /// @return Total bonus in basis points (e.g., 550 = 5.5%)
+    function calculateLiquidationBonus(uint256 healthFactor) public view returns (uint256) {
+        if (healthFactor >= WAD) revert PositionNotLiquidatable();
+        uint256 depthBps = ((WAD - healthFactor) * _depthScalingFactor) / 1e16;
+        if (depthBps > _maxDepthBonusBps) depthBps = _maxDepthBonusBps;
+        return _baseBonusBps + depthBps;
     }
 
     /// @notice Get the liquidation threshold for a collateral token
@@ -82,10 +103,10 @@ contract LiquidationEngine is ChariotBase, ILiquidationEngine {
         return _collateralManager.getLiquidationThreshold();
     }
 
-    /// @notice Get the liquidation bonus for a collateral token
-    /// @return Liquidation bonus in WAD (e.g., 5e16 = 5%)
-    function getLiquidationBonus(address) external pure returns (uint256) {
-        return LIQUIDATION_BONUS;
+    /// @notice Get the base liquidation bonus for a collateral token
+    /// @return Base liquidation bonus in WAD (e.g., 5e16 = 5%)
+    function getLiquidationBonus(address) external view returns (uint256) {
+        return _baseBonusBps * 1e14;
     }
 
     /// @notice Check if a borrower's position is liquidatable based on stored oracle data
@@ -119,6 +140,20 @@ contract LiquidationEngine is ChariotBase, ILiquidationEngine {
         return ChariotMath.wadMul(baseCollateral, WAD + bonus);
     }
 
+    // -- Bonus Parameter Getters --
+
+    function baseBonusBps() external view returns (uint256) {
+        return _baseBonusBps;
+    }
+
+    function maxDepthBonusBps() external view returns (uint256) {
+        return _maxDepthBonusBps;
+    }
+
+    function depthScalingFactor() external view returns (uint256) {
+        return _depthScalingFactor;
+    }
+
     // -- Events --
     event LendingPoolUpdated(address indexed oldPool, address indexed newPool);
     event CollateralManagerUpdated(address indexed oldManager, address indexed newManager);
@@ -145,6 +180,29 @@ contract LiquidationEngine is ChariotBase, ILiquidationEngine {
         address old = address(_vault);
         _vault = IChariotVault(vault_);
         emit VaultUpdated(old, vault_);
+    }
+
+    /// @notice Set the base liquidation bonus
+    /// @param newBaseBps New base bonus in BPS (e.g., 500 = 5%)
+    function setBaseBonusBps(uint256 newBaseBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newBaseBps + _maxDepthBonusBps > MAX_TOTAL_BONUS_BPS) revert InvalidBonusParams();
+        _baseBonusBps = newBaseBps;
+        emit LiquidationBonusParamsUpdated(_baseBonusBps, _maxDepthBonusBps, _depthScalingFactor);
+    }
+
+    /// @notice Set the maximum depth bonus
+    /// @param newMaxBps New max depth bonus in BPS (e.g., 500 = 5% cap)
+    function setMaxDepthBonusBps(uint256 newMaxBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_baseBonusBps + newMaxBps > MAX_TOTAL_BONUS_BPS) revert InvalidBonusParams();
+        _maxDepthBonusBps = newMaxBps;
+        emit LiquidationBonusParamsUpdated(_baseBonusBps, _maxDepthBonusBps, _depthScalingFactor);
+    }
+
+    /// @notice Set the depth scaling factor
+    /// @param newFactor New scaling factor (e.g., 50)
+    function setDepthScalingFactor(uint256 newFactor) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _depthScalingFactor = newFactor;
+        emit LiquidationBonusParamsUpdated(_baseBonusBps, _maxDepthBonusBps, _depthScalingFactor);
     }
 
     // -- Internal Functions --
@@ -178,12 +236,16 @@ contract LiquidationEngine is ChariotBase, ILiquidationEngine {
         );
         if (debtToRepay > maxRepayable) revert ExceedsMaxLiquidation();
 
+        // Calculate scaled bonus
+        uint256 bonusBps = calculateLiquidationBonus(healthFactor);
+        params.bonusWad = bonusBps * 1e14; // Convert BPS to WAD
+
         // Calculate seizure amount
         uint256 ethPrice = _collateralManager.getETHPrice();
         if (ethPrice == 0) revert StalePriceData();
 
         params.seizureAmount =
-            calculateSeizableCollateral(ChariotMath.usdcToWad(debtToRepay), ethPrice, LIQUIDATION_BONUS);
+            calculateSeizableCollateral(ChariotMath.usdcToWad(debtToRepay), ethPrice, params.bonusWad);
 
         // Validate sufficient collateral
         uint256 collateralBalance = _collateralManager.getCollateralBalance(borrower, collateralToken);

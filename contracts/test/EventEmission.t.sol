@@ -166,8 +166,11 @@ contract EventEmissionTest is Test {
         stork.setPriceNow(ETHUSD_FEED_ID, int192(int256(1800e18)));
 
         uint256 debtToRepay = 2000 * USDC_UNIT;
+        // HF = 0.984e18 -> scaled bonus = 580 BPS = 5.8e16 WAD
+        uint256 bonusBps = liquidationEngine.calculateLiquidationBonus(984e15);
+        uint256 bonusWad = bonusBps * 1e14;
         uint256 expectedSeizure =
-            liquidationEngine.calculateSeizableCollateral(uint256(2000e18), uint256(1800e18), 5e16);
+            liquidationEngine.calculateSeizableCollateral(uint256(2000e18), uint256(1800e18), bonusWad);
 
         // Expect CollateralSeized from CollateralManager during liquidation
         vm.expectEmit(true, true, true, true);
@@ -345,12 +348,16 @@ contract EventEmissionTest is Test {
         stork.setPriceNow(ETHUSD_FEED_ID, int192(int256(1800e18)));
 
         uint256 debtToRepay = 2000 * USDC_UNIT;
-        uint256 bonus = liquidationEngine.LIQUIDATION_BONUS();
+        // HF = (5*1800*0.82)/7500 = 0.984e18 -> bonusBps = 580 -> bonusWad = 5.8e16
+        uint256 bonusBps = liquidationEngine.calculateLiquidationBonus(984e15);
+        uint256 bonusWad = bonusBps * 1e14;
         uint256 expectedSeizure =
-            liquidationEngine.calculateSeizableCollateral(uint256(2000e18), uint256(1800e18), bonus);
+            liquidationEngine.calculateSeizableCollateral(uint256(2000e18), uint256(1800e18), bonusWad);
 
         vm.expectEmit(true, true, true, true);
-        emit ILiquidationEngine.PositionLiquidated(alice, bob, address(bridgedETH), debtToRepay, expectedSeizure, bonus);
+        emit ILiquidationEngine.PositionLiquidated(
+            alice, bob, address(bridgedETH), debtToRepay, expectedSeizure, bonusWad
+        );
 
         vm.prank(bob);
         liquidationEngine.liquidate(alice, address(bridgedETH), debtToRepay, emptyUpdates);

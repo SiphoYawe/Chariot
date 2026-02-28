@@ -15,6 +15,8 @@ interface ILiquidationEngine {
         uint256 liquidationBonus
     );
 
+    event LiquidationBonusParamsUpdated(uint256 baseBps, uint256 maxDepthBps, uint256 scalingFactor);
+
     // -- Errors --
     // Note: ZeroAmount() inherited from ChariotBase
     error PositionNotLiquidatable();
@@ -23,6 +25,7 @@ interface ILiquidationEngine {
     error InvalidCollateralToken();
     error SelfLiquidation();
     error StalePriceData();
+    error InvalidBonusParams();
 
     // -- Functions --
     function liquidate(
@@ -32,6 +35,7 @@ interface ILiquidationEngine {
         StorkStructs.TemporalNumericValueInput[] calldata priceUpdates
     ) external;
 
+    function calculateLiquidationBonus(uint256 healthFactor) external view returns (uint256);
     function getLiquidationBonus(address collateralToken) external view returns (uint256);
     function getLiquidationThreshold(address collateralToken) external view returns (uint256);
     function isLiquidatable(address borrower) external view returns (bool);

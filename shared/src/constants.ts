@@ -47,7 +47,9 @@ export const RISK_PARAMS = {
   BRIDGED_ETH: {
     BASE_LTV: 0.75, // 75%
     LIQUIDATION_THRESHOLD: 0.82, // 82%
-    LIQUIDATION_BONUS: 0.05, // 5%
+    LIQUIDATION_BONUS_BASE: 0.05, // 5% base
+    LIQUIDATION_BONUS_MAX_DEPTH: 0.05, // 5% max depth bonus
+    LIQUIDATION_BONUS_DEPTH_FACTOR: 50, // depth scaling multiplier
   },
 } as const;
 
