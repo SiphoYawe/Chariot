@@ -119,21 +119,32 @@ contract LiquidationEngine is ChariotBase, ILiquidationEngine {
         return ChariotMath.wadMul(baseCollateral, WAD + bonus);
     }
 
+    // -- Events --
+    event LendingPoolUpdated(address indexed oldPool, address indexed newPool);
+    event CollateralManagerUpdated(address indexed oldManager, address indexed newManager);
+    event VaultUpdated(address indexed oldVault, address indexed newVault);
+
     // -- Admin Functions --
 
     function setLendingPool(address lendingPool_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (lendingPool_ == address(0)) revert ZeroAddress();
+        address old = address(_lendingPool);
         _lendingPool = ILendingPool(lendingPool_);
+        emit LendingPoolUpdated(old, lendingPool_);
     }
 
     function setCollateralManager(address collateralManager_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (collateralManager_ == address(0)) revert ZeroAddress();
+        address old = address(_collateralManager);
         _collateralManager = ICollateralManager(collateralManager_);
+        emit CollateralManagerUpdated(old, collateralManager_);
     }
 
     function setVault(address vault_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (vault_ == address(0)) revert ZeroAddress();
+        address old = address(_vault);
         _vault = IChariotVault(vault_);
+        emit VaultUpdated(old, vault_);
     }
 
     // -- Internal Functions --

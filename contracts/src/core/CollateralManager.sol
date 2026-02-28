@@ -52,6 +52,7 @@ contract CollateralManager is ChariotBase, ICollateralManager {
     event CollateralConfigUpdated(
         address indexed token, uint256 baseLTV, uint256 liquidationThreshold, uint256 liquidationBonus
     );
+    event LendingPoolUpdated(address indexed oldPool, address indexed newPool);
 
     // -- Errors --
     error InvalidLTV();
@@ -237,7 +238,9 @@ contract CollateralManager is ChariotBase, ICollateralManager {
     /// @param lendingPool_ The LendingPool contract address
     function setLendingPool(address lendingPool_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (lendingPool_ == address(0)) revert ZeroAddress();
+        address old = address(_lendingPool);
         _lendingPool = ILendingPool(lendingPool_);
+        emit LendingPoolUpdated(old, lendingPool_);
     }
 
     /// @notice Set the Stork price feed ID for a collateral token

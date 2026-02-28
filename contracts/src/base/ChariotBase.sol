@@ -34,6 +34,8 @@ abstract contract ChariotBase is AccessControl, ReentrancyGuard {
     error BorrowingPaused();
 
     // -- Events --
+    /// @dev Reserved for future use -- oracle price updates are sourced from the Stork oracle contract directly.
+    ///      Not emitted by Chariot contracts in MVP; will be activated when custom oracle adapter is introduced.
     event OraclePriceUpdated(bytes32 indexed feedId, uint256 price, uint256 timestamp);
     event StorkOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event CircuitBreakerUpdated(address indexed oldBreaker, address indexed newBreaker);
@@ -57,6 +59,7 @@ abstract contract ChariotBase is AccessControl, ReentrancyGuard {
     // -- Admin Functions --
 
     function setCircuitBreaker(address _circuitBreaker) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_circuitBreaker == address(0)) revert ZeroAddress();
         address old = circuitBreaker;
         circuitBreaker = _circuitBreaker;
         emit CircuitBreakerUpdated(old, _circuitBreaker);

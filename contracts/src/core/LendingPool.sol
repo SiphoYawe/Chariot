@@ -246,18 +246,32 @@ contract LendingPool is ChariotBase, ILendingPool {
         return _globalInterestIndex;
     }
 
+    // -- Events --
+    event InterestRateModelUpdated(address indexed oldModel, address indexed newModel);
+    event CollateralManagerUpdated(address indexed oldManager, address indexed newManager);
+    event VaultUpdated(address indexed oldVault, address indexed newVault);
+
     // -- Admin Functions --
 
     function setInterestRateModel(address interestRateModel_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (interestRateModel_ == address(0)) revert ZeroAddress();
+        address old = address(_interestRateModel);
         _interestRateModel = IInterestRateModel(interestRateModel_);
+        emit InterestRateModelUpdated(old, interestRateModel_);
     }
 
     function setCollateralManager(address collateralManager_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (collateralManager_ == address(0)) revert ZeroAddress();
+        address old = address(_collateralManager);
         _collateralManager = ICollateralManager(collateralManager_);
+        emit CollateralManagerUpdated(old, collateralManager_);
     }
 
     function setVault(address vault_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (vault_ == address(0)) revert ZeroAddress();
+        address old = address(_vault);
         _vault = IChariotVault(vault_);
+        emit VaultUpdated(old, vault_);
     }
 
     // -- Internal Functions --
