@@ -108,8 +108,7 @@ contract OracleIntegrationTest is Test {
         StorkStructs.TemporalNumericValueInput[] memory updates = new StorkStructs.TemporalNumericValueInput[](1);
         updates[0] = StorkStructs.TemporalNumericValueInput({
             temporalNumericValue: StorkStructs.TemporalNumericValue({
-                timestampNs: uint64(block.timestamp) * 1e9,
-                quantizedValue: int192(int256(2000e18))
+                timestampNs: uint64(block.timestamp) * 1e9, quantizedValue: int192(int256(2000e18))
             }),
             id: ETHUSD_FEED_ID,
             publisherMerkleRoot: bytes32(0),
@@ -202,9 +201,7 @@ contract OracleIntegrationTest is Test {
         bytes32 newFeedId = keccak256("BTCUSD");
         bytes32 adminRole = collateralManager.DEFAULT_ADMIN_ROLE();
 
-        vm.expectRevert(
-            abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", alice, adminRole)
-        );
+        vm.expectRevert(abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", alice, adminRole));
         vm.prank(alice);
         collateralManager.setPriceFeedId(newToken, newFeedId);
     }

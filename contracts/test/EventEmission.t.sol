@@ -350,9 +350,7 @@ contract EventEmissionTest is Test {
             liquidationEngine.calculateSeizableCollateral(uint256(2000e18), uint256(1800e18), bonus);
 
         vm.expectEmit(true, true, true, true);
-        emit ILiquidationEngine.PositionLiquidated(
-            alice, bob, address(bridgedETH), debtToRepay, expectedSeizure, bonus
-        );
+        emit ILiquidationEngine.PositionLiquidated(alice, bob, address(bridgedETH), debtToRepay, expectedSeizure, bonus);
 
         vm.prank(bob);
         liquidationEngine.liquidate(alice, address(bridgedETH), debtToRepay, emptyUpdates);
@@ -417,8 +415,8 @@ contract EventEmissionTest is Test {
         bytes32 feedId = keccak256("MOCK_FEED");
 
         CollateralManager.CollateralConfig memory config = CollateralManager.CollateralConfig({
-            baseLTV: 0.70e18,
-            liquidationThreshold: 0.80e18,
+            baseLTV: 0.7e18,
+            liquidationThreshold: 0.8e18,
             liquidationBonus: 0.05e18,
             priceFeedId: feedId,
             volatilityFeedId: bytes32(0),
@@ -428,7 +426,7 @@ contract EventEmissionTest is Test {
         vm.startPrank(admin);
 
         vm.expectEmit(true, true, true, true);
-        emit CollateralManager.CollateralTypeAdded(mockToken, 0.70e18, 0.80e18, 0.05e18);
+        emit CollateralManager.CollateralTypeAdded(mockToken, 0.7e18, 0.8e18, 0.05e18);
 
         collateralManager.addCollateralType(mockToken, config);
         vm.stopPrank();
@@ -441,8 +439,8 @@ contract EventEmissionTest is Test {
 
         // First add the collateral type
         CollateralManager.CollateralConfig memory config = CollateralManager.CollateralConfig({
-            baseLTV: 0.70e18,
-            liquidationThreshold: 0.80e18,
+            baseLTV: 0.7e18,
+            liquidationThreshold: 0.8e18,
             liquidationBonus: 0.05e18,
             priceFeedId: feedId,
             volatilityFeedId: bytes32(0),
@@ -682,7 +680,7 @@ contract EventEmissionTest is Test {
     function test_setParameters_emitsRateModelParametersUpdated() public {
         uint256 optUtil = 0.85e18;
         uint256 slope1 = 0.05e18;
-        uint256 slope2 = 0.80e18;
+        uint256 slope2 = 0.8e18;
         uint256 rf = 0.15e18;
 
         vm.expectEmit(true, true, true, true);

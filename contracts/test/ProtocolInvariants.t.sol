@@ -309,8 +309,8 @@ contract ProtocolInvariantsTest is Test {
         // Capture HF before liquidation
         uint256 collateralValueBefore = collateralManager.getCollateralValueView(alice);
         uint256 debtBefore = pool.getUserDebt(alice);
-        uint256 hfBefore = ((collateralValueBefore * 1e12 * collateralManager.getLiquidationThreshold()) / 1e18)
-            * 1e18 / (debtBefore * 1e12);
+        uint256 hfBefore = ((collateralValueBefore * 1e12 * collateralManager.getLiquidationThreshold()) / 1e18) * 1e18
+            / (debtBefore * 1e12);
         assertTrue(hfBefore < 1e18, "HF should be below 1.0 before liquidation");
 
         // 3. Bob liquidates $2000 of alice's debt

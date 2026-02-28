@@ -30,9 +30,7 @@ contract InterestRateModel is IInterestRateModel, AccessControl {
     mapping(address => uint256) private _kVolCoefficients; // per-collateral k_vol in WAD
 
     // -- Events --
-    event RateModelParametersUpdated(
-        uint256 optimalUtilisation, uint256 slope1, uint256 slope2, uint256 reserveFactor
-    );
+    event RateModelParametersUpdated(uint256 optimalUtilisation, uint256 slope1, uint256 slope2, uint256 reserveFactor);
     event KVolCoefficientUpdated(address indexed collateralToken, uint256 kVol);
     event RiskParameterEngineUpdated(address indexed oldEngine, address indexed newEngine);
 
@@ -63,12 +61,10 @@ contract InterestRateModel is IInterestRateModel, AccessControl {
     /// @param slope1_ Rate slope below kink in WAD (must be > 0)
     /// @param slope2_ Rate slope above kink in WAD (must be > 0)
     /// @param reserveFactor_ Protocol reserve factor in WAD (must be < 100%)
-    function setParameters(
-        uint256 optimalUtilisation_,
-        uint256 slope1_,
-        uint256 slope2_,
-        uint256 reserveFactor_
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setParameters(uint256 optimalUtilisation_, uint256 slope1_, uint256 slope2_, uint256 reserveFactor_)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         if (optimalUtilisation_ == 0 || optimalUtilisation_ > WAD) revert InvalidOptimalUtilisation();
         if (slope1_ == 0) revert InvalidSlope();
         if (slope2_ == 0) revert InvalidSlope();
@@ -150,11 +146,7 @@ contract InterestRateModel is IInterestRateModel, AccessControl {
     /// @param utilisation The pool utilisation ratio in WAD
     /// @param collateralToken The primary collateral token for premium calculation
     /// @return Total borrow rate in WAD (base + premium)
-    function getBorrowRateWithVolatility(uint256 utilisation, address collateralToken)
-        public
-        view
-        returns (uint256)
-    {
+    function getBorrowRateWithVolatility(uint256 utilisation, address collateralToken) public view returns (uint256) {
         uint256 baseRate = getBorrowRate(utilisation);
         uint256 premium = getVolatilityPremium(collateralToken);
         return baseRate + premium;
@@ -189,11 +181,7 @@ contract InterestRateModel is IInterestRateModel, AccessControl {
     /// @param utilisation The pool utilisation ratio in WAD
     /// @param collateralToken The primary collateral token for premium calculation
     /// @return The supply rate in WAD including volatility premium effect
-    function getSupplyRateWithVolatility(uint256 utilisation, address collateralToken)
-        external
-        view
-        returns (uint256)
-    {
+    function getSupplyRateWithVolatility(uint256 utilisation, address collateralToken) external view returns (uint256) {
         uint256 borrowRate = getBorrowRateWithVolatility(utilisation, collateralToken);
         return borrowRate.mulWad(utilisation).mulWad(WAD - reserveFactor);
     }

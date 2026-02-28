@@ -314,9 +314,7 @@ contract LiquidationEngineTest is Test {
             liquidationEngine.calculateSeizableCollateral(uint256(2000e18), uint256(1800e18), bonus);
 
         vm.expectEmit(true, true, true, true);
-        emit ILiquidationEngine.PositionLiquidated(
-            alice, bob, address(bridgedETH), debtToRepay, expectedSeizure, bonus
-        );
+        emit ILiquidationEngine.PositionLiquidated(alice, bob, address(bridgedETH), debtToRepay, expectedSeizure, bonus);
 
         vm.prank(bob);
         liquidationEngine.liquidate(alice, address(bridgedETH), debtToRepay, emptyUpdates);

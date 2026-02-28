@@ -143,8 +143,7 @@ contract InterestRateModelVolatilityTest is Test {
     /// @notice Rate breakdown returns correct component values
     function test_rateBreakdown_at35Vol() public {
         _setVolatility(35e16);
-        (uint256 baseRate, uint256 volatilityPremium, uint256 totalRate) =
-            model.getRateBreakdown(0.8e18, BRIDGED_ETH);
+        (uint256 baseRate, uint256 volatilityPremium, uint256 totalRate) = model.getRateBreakdown(0.8e18, BRIDGED_ETH);
         assertEq(baseRate, 0.04e18, "Base rate should be 4%");
         assertEq(volatilityPremium, 5e16, "Premium should be 5%");
         assertEq(totalRate, 0.09e18, "Total should be 9%");
@@ -153,8 +152,7 @@ contract InterestRateModelVolatilityTest is Test {
     /// @notice Rate breakdown in calm market -- premium is 0
     function test_rateBreakdown_calmMarket() public {
         _setVolatility(20e16);
-        (uint256 baseRate, uint256 volatilityPremium, uint256 totalRate) =
-            model.getRateBreakdown(0.8e18, BRIDGED_ETH);
+        (uint256 baseRate, uint256 volatilityPremium, uint256 totalRate) = model.getRateBreakdown(0.8e18, BRIDGED_ETH);
         assertEq(baseRate, 0.04e18, "Base rate should be 4%");
         assertEq(volatilityPremium, 0, "Premium should be 0%");
         assertEq(totalRate, 0.04e18, "Total should be 4%");

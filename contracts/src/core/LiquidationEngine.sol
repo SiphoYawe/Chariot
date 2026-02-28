@@ -173,15 +173,17 @@ contract LiquidationEngine is ChariotBase, ILiquidationEngine {
         if (healthFactor >= WAD) revert PositionNotLiquidatable();
 
         // Validate max liquidation ratio
-        uint256 maxRepayable =
-            ChariotMath.wadToUsdc(ChariotMath.wadMul(ChariotMath.usdcToWad(params.borrowerDebt), MAX_LIQUIDATION_RATIO));
+        uint256 maxRepayable = ChariotMath.wadToUsdc(
+            ChariotMath.wadMul(ChariotMath.usdcToWad(params.borrowerDebt), MAX_LIQUIDATION_RATIO)
+        );
         if (debtToRepay > maxRepayable) revert ExceedsMaxLiquidation();
 
         // Calculate seizure amount
         uint256 ethPrice = _collateralManager.getETHPrice();
         if (ethPrice == 0) revert StalePriceData();
 
-        params.seizureAmount = calculateSeizableCollateral(ChariotMath.usdcToWad(debtToRepay), ethPrice, LIQUIDATION_BONUS);
+        params.seizureAmount =
+            calculateSeizableCollateral(ChariotMath.usdcToWad(debtToRepay), ethPrice, LIQUIDATION_BONUS);
 
         // Validate sufficient collateral
         uint256 collateralBalance = _collateralManager.getCollateralBalance(borrower, collateralToken);

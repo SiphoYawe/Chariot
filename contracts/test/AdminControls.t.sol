@@ -98,9 +98,7 @@ contract AdminControlsTest is Test {
         CollateralManager.CollateralConfig memory config = _defaultConfig();
         bytes32 adminRole = collateralManager.DEFAULT_ADMIN_ROLE();
 
-        vm.expectRevert(
-            abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", alice, adminRole)
-        );
+        vm.expectRevert(abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", alice, adminRole));
         vm.prank(alice);
         collateralManager.addCollateralType(newToken, config);
     }
@@ -130,7 +128,9 @@ contract AdminControlsTest is Test {
         CollateralManager.CollateralConfig memory config = _defaultConfig();
 
         vm.expectEmit(true, false, false, true);
-        emit CollateralManager.CollateralTypeAdded(newToken, config.baseLTV, config.liquidationThreshold, config.liquidationBonus);
+        emit CollateralManager.CollateralTypeAdded(
+            newToken, config.baseLTV, config.liquidationThreshold, config.liquidationBonus
+        );
 
         vm.prank(admin);
         collateralManager.addCollateralType(newToken, config);
@@ -316,9 +316,7 @@ contract AdminControlsTest is Test {
     function test_setParameters_revertsForNonAdmin() public {
         bytes32 adminRole = rateModel.DEFAULT_ADMIN_ROLE();
 
-        vm.expectRevert(
-            abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", alice, adminRole)
-        );
+        vm.expectRevert(abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", alice, adminRole));
         vm.prank(alice);
         rateModel.setParameters(0.8e18, 0.04e18, 0.75e18, 0.1e18);
     }
