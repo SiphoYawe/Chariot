@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import {
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useAccount,
+} from "wagmi";
+import { parseUnits, pad } from "viem";
+import { CHARIOT_ADDRESSES, LendingPoolABI } from "@chariot/shared";
 
 export type BridgeUSDCStatus =
   | "idle"
@@ -14,82 +21,124 @@ interface UseBridgeUSDCReturn {
   txHash: string | null;
   errorMessage: string | null;
   /** Execute bridge USDC transaction */
-  bridge: (amount: string, destinationDomain: number, recipientAddress: string) => Promise<void>;
+  bridge: (amount: string, destinationDomain: number, recipientAddress: string) => void;
   /** Reset to idle state */
   reset: () => void;
 }
 
 /**
  * Hook for bridging USDC from Arc to other chains via CCTP.
- * Calls CCTPBridge.bridgeUSDC or LendingPool.borrowAndBridge.
+ * Calls lendingPool.borrowAndBridge(collateralToken, amount, destinationDomain, mintRecipient, priceUpdates).
  *
- * Uses mock logic until contracts are deployed.
- * When ABIs are populated, replace with:
- * - useWriteContract for USDC.approve(CCTPBridge, amount)
- * - useWriteContract for CCTPBridge.bridgeUSDC(amount, domain, recipient)
- * - useWaitForTransactionReceipt for confirmation
+ * Note: CCTP Bridge may not be deployed yet. The hook checks that the CCTP_BRIDGE
+ * address is set before proceeding.
  */
 export function useBridgeUSDC(): UseBridgeUSDCReturn {
   const [status, setStatus] = useState<BridgeUSDCStatus>("idle");
-  const [txHash, setTxHash] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const inFlightRef = useRef(false);
 
+  const { address } = useAccount();
+
+  // -- Write contract for borrowAndBridge --
+  const {
+    writeContract,
+    data: hash,
+    isPending,
+    error: writeError,
+    reset: resetWrite,
+  } = useWriteContract();
+
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+  } = useWaitForTransactionReceipt({ hash });
+
+  // -- State machine transitions --
+
+  // Transaction confirmed
+  useEffect(() => {
+    if (isConfirmed && status === "bridging") {
+      setStatus("confirmed");
+      inFlightRef.current = false;
+    }
+  }, [isConfirmed, status]);
+
+  // Transaction error
+  useEffect(() => {
+    if (writeError && status === "bridging") {
+      setStatus("error");
+      setErrorMessage(
+        "Bridge failed. Your USDC is safe on Arc. Please try again."
+      );
+      inFlightRef.current = false;
+    }
+  }, [writeError, status]);
+
+  // -- Actions --
+
   const bridge = useCallback(
-    async (amount: string, destinationDomain: number, recipientAddress: string) => {
+    (amount: string, destinationDomain: number, recipientAddress: string) => {
       // Prevent concurrent invocations
       if (inFlightRef.current) return;
-      inFlightRef.current = true;
 
-      try {
-        setErrorMessage(null);
+      if (!address) {
+        setStatus("error");
+        setErrorMessage("Wallet not connected.");
+        return;
+      }
 
-        const parsed = parseFloat(amount);
-        if (!amount || !Number.isFinite(parsed) || parsed <= 0) {
-          throw new Error("Invalid amount");
-        }
+      const parsed = parseFloat(amount);
+      if (!amount || !Number.isFinite(parsed) || parsed <= 0) {
+        setStatus("error");
+        setErrorMessage("Invalid amount.");
+        return;
+      }
 
-        if (!recipientAddress) {
-          throw new Error("Recipient address required");
-        }
+      if (!recipientAddress) {
+        setStatus("error");
+        setErrorMessage("Recipient address required.");
+        return;
+      }
 
-        // Step 1: Approve USDC
-        setStatus("approving");
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        // Step 2: Bridge USDC
-        setStatus("bridging");
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Mock tx hash
-        const mockHash =
-          "0x" +
-          Array.from({ length: 64 }, () =>
-            Math.floor(Math.random() * 16).toString(16)
-          ).join("");
-
-        setTxHash(mockHash);
-        setStatus("confirmed");
-      } catch (err) {
+      // Check that CCTP_BRIDGE is deployed
+      if (!CHARIOT_ADDRESSES.CCTP_BRIDGE || CHARIOT_ADDRESSES.CCTP_BRIDGE === ("" as `0x${string}`)) {
         setStatus("error");
         setErrorMessage(
-          err instanceof Error
-            ? err.message
-            : "Bridge failed. Your USDC is safe on Arc. Please try again."
+          "CCTP Bridge is not deployed yet. Bridging is not available at this time."
         );
-      } finally {
-        inFlightRef.current = false;
+        return;
       }
+
+      inFlightRef.current = true;
+      setStatus("bridging");
+      setErrorMessage(null);
+
+      // Convert recipient address to bytes32 (pad to 32 bytes)
+      const mintRecipient = pad(recipientAddress as `0x${string}`, { size: 32 });
+
+      writeContract({
+        address: CHARIOT_ADDRESSES.LENDING_POOL,
+        abi: LendingPoolABI,
+        functionName: "borrowAndBridge",
+        args: [
+          CHARIOT_ADDRESSES.BRIDGED_ETH,
+          parseUnits(amount, 6),
+          destinationDomain,
+          mintRecipient,
+          [], // priceUpdates -- empty array, admin-set oracle
+        ],
+      });
     },
-    []
+    [address, writeContract]
   );
 
   const reset = useCallback(() => {
     setStatus("idle");
-    setTxHash(null);
     setErrorMessage(null);
     inFlightRef.current = false;
-  }, []);
+    resetWrite();
+  }, [resetWrite]);
 
-  return { status, txHash, errorMessage, bridge, reset };
+  return { status, txHash: hash ?? null, errorMessage, bridge, reset };
 }

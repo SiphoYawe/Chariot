@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import {
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useAccount,
+} from "wagmi";
+import { parseUnits } from "viem";
+import { CHARIOT_ADDRESSES, ChariotVaultABI } from "@chariot/shared";
 
 export type WithdrawStatus =
   | "idle"
@@ -13,62 +20,92 @@ interface UseVaultWithdrawReturn {
   txHash: string | null;
   errorMessage: string | null;
   /** Execute the withdrawal */
-  withdraw: (amount: string) => Promise<void>;
+  withdraw: (amount: string) => void;
   /** Reset to idle state */
   reset: () => void;
 }
 
 /**
  * Hook for withdrawing USDC from the ChariotVault.
- * Uses mock logic until contracts are deployed.
- *
- * When ABIs are populated, replace with:
- * - useWriteContract for vault.withdraw(assets, receiver, owner)
- * - useWaitForTransactionReceipt for confirmation
+ * Calls vault.withdraw(assets, receiver, owner) using real wagmi contract calls.
  */
 export function useVaultWithdraw(): UseVaultWithdrawReturn {
   const [status, setStatus] = useState<WithdrawStatus>("idle");
-  const [txHash, setTxHash] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const withdraw = useCallback(async (amount: string) => {
-    try {
-      setStatus("withdrawing");
-      setErrorMessage(null);
+  const { address } = useAccount();
 
-      if (!amount || parseFloat(amount) <= 0) {
-        throw new Error("Invalid amount");
-      }
+  // -- Write contract for withdraw --
+  const {
+    writeContract,
+    data: hash,
+    isPending,
+    error: writeError,
+    reset: resetWrite,
+  } = useWriteContract();
 
-      // Mock: simulate withdrawal transaction
-      await new Promise((resolve) => setTimeout(resolve, 2500));
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+  } = useWaitForTransactionReceipt({ hash });
 
-      // Mock transaction hash
-      const mockHash =
-        "0x" +
-        Array.from({ length: 64 }, () =>
-          Math.floor(Math.random() * 16).toString(16)
-        ).join("");
+  // -- State machine transitions --
 
-      setTxHash(mockHash);
+  // Transaction confirmed
+  useEffect(() => {
+    if (isConfirmed && status === "withdrawing") {
       setStatus("confirmed");
-    } catch {
+    }
+  }, [isConfirmed, status]);
+
+  // Transaction error
+  useEffect(() => {
+    if (writeError && status === "withdrawing") {
       setStatus("error");
       setErrorMessage(
         "Withdrawal failed. Your chUSDC is still in the vault. Check your balance and try again."
       );
     }
-  }, []);
+  }, [writeError, status]);
+
+  // -- Actions --
+
+  const withdraw = useCallback(
+    (amount: string) => {
+      if (!address) {
+        setStatus("error");
+        setErrorMessage("Wallet not connected.");
+        return;
+      }
+
+      if (!amount || parseFloat(amount) <= 0) {
+        setStatus("error");
+        setErrorMessage("Invalid withdrawal amount.");
+        return;
+      }
+
+      setStatus("withdrawing");
+      setErrorMessage(null);
+
+      writeContract({
+        address: CHARIOT_ADDRESSES.CHARIOT_VAULT,
+        abi: ChariotVaultABI,
+        functionName: "withdraw",
+        args: [parseUnits(amount, 6), address, address],
+      });
+    },
+    [address, writeContract]
+  );
 
   const reset = useCallback(() => {
     setStatus("idle");
-    setTxHash(null);
     setErrorMessage(null);
-  }, []);
+    resetWrite();
+  }, [resetWrite]);
 
   return {
     status,
-    txHash,
+    txHash: hash ?? null,
     errorMessage,
     withdraw,
     reset,

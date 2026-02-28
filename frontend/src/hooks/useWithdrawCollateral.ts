@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import {
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useAccount,
+} from "wagmi";
+import { parseUnits } from "viem";
+import { CHARIOT_ADDRESSES, CollateralManagerABI } from "@chariot/shared";
 
 export type WithdrawStatus =
   | "idle"
@@ -13,7 +20,7 @@ interface UseWithdrawCollateralReturn {
   txHash: string | null;
   errorMessage: string | null;
   /** Execute collateral withdrawal */
-  withdraw: (amount: string) => Promise<void>;
+  withdraw: (amount: string) => void;
   /** Reset to idle state */
   reset: () => void;
 }
@@ -21,48 +28,84 @@ interface UseWithdrawCollateralReturn {
 /**
  * Hook for withdrawing BridgedETH collateral from CollateralManager.
  * Only available when user has zero debt.
- *
- * When ABIs are populated, replace with:
- * - useWriteContract for CollateralManager.withdrawCollateral(token, amount)
- * - useWaitForTransactionReceipt for confirmation
+ * Note: BridgedETH uses 18 decimals.
  */
 export function useWithdrawCollateral(): UseWithdrawCollateralReturn {
   const [status, setStatus] = useState<WithdrawStatus>("idle");
-  const [txHash, setTxHash] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const withdraw = useCallback(async (amount: string) => {
-    try {
-      setStatus("withdrawing");
-      setErrorMessage(null);
+  const { address } = useAccount();
 
-      if (!amount || parseFloat(amount) <= 0) {
-        throw new Error("Invalid amount");
-      }
+  // -- Write contract for withdrawCollateral --
+  const {
+    writeContract,
+    data: hash,
+    isPending,
+    error: writeError,
+    reset: resetWrite,
+  } = useWriteContract();
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+  } = useWaitForTransactionReceipt({ hash });
 
-      const mockHash =
-        "0x" +
-        Array.from({ length: 64 }, () =>
-          Math.floor(Math.random() * 16).toString(16)
-        ).join("");
+  // -- State machine transitions --
 
-      setTxHash(mockHash);
+  // Transaction confirmed
+  useEffect(() => {
+    if (isConfirmed && status === "withdrawing") {
       setStatus("confirmed");
-    } catch {
+    }
+  }, [isConfirmed, status]);
+
+  // Transaction error
+  useEffect(() => {
+    if (writeError && status === "withdrawing") {
       setStatus("error");
       setErrorMessage(
         "Withdrawal failed. Your collateral is still deposited. Check your debt status and try again."
       );
     }
-  }, []);
+  }, [writeError, status]);
+
+  // -- Actions --
+
+  const withdraw = useCallback(
+    (amount: string) => {
+      if (!address) {
+        setStatus("error");
+        setErrorMessage("Wallet not connected.");
+        return;
+      }
+
+      if (!amount || parseFloat(amount) <= 0) {
+        setStatus("error");
+        setErrorMessage("Invalid withdrawal amount.");
+        return;
+      }
+
+      setStatus("withdrawing");
+      setErrorMessage(null);
+
+      writeContract({
+        address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
+        abi: CollateralManagerABI,
+        functionName: "withdrawCollateral",
+        args: [
+          CHARIOT_ADDRESSES.BRIDGED_ETH,
+          parseUnits(amount, 18), // BridgedETH uses 18 decimals
+        ],
+      });
+    },
+    [address, writeContract]
+  );
 
   const reset = useCallback(() => {
     setStatus("idle");
-    setTxHash(null);
     setErrorMessage(null);
-  }, []);
+    resetWrite();
+  }, [resetWrite]);
 
-  return { status, txHash, errorMessage, withdraw, reset };
+  return { status, txHash: hash ?? null, errorMessage, withdraw, reset };
 }

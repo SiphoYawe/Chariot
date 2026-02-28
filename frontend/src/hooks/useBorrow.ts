@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import {
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useAccount,
+} from "wagmi";
+import { parseUnits } from "viem";
+import { CHARIOT_ADDRESSES, LendingPoolABI } from "@chariot/shared";
 
 export type BorrowStatus =
   | "idle"
@@ -13,58 +20,93 @@ interface UseBorrowReturn {
   txHash: string | null;
   errorMessage: string | null;
   /** Execute borrow transaction */
-  borrow: (amount: string) => Promise<void>;
+  borrow: (amount: string) => void;
   /** Reset to idle state */
   reset: () => void;
 }
 
 /**
  * Hook for borrowing USDC from LendingPool.
- * Uses mock logic until contracts are deployed.
- *
- * When ABIs are populated, replace with:
- * - Fetch Stork signed price data from REST API
- * - useWriteContract for LendingPool.borrow(collateralToken, amount, priceUpdates)
- * - useWaitForTransactionReceipt for confirmation
+ * Calls lendingPool.borrow(collateralToken, amount, priceUpdates) using real wagmi contract calls.
+ * Uses an empty priceUpdates array since the protocol uses admin-set oracle prices.
  */
 export function useBorrow(): UseBorrowReturn {
   const [status, setStatus] = useState<BorrowStatus>("idle");
-  const [txHash, setTxHash] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const borrow = useCallback(async (amount: string) => {
-    try {
-      setStatus("borrowing");
-      setErrorMessage(null);
+  const { address } = useAccount();
 
-      if (!amount || parseFloat(amount) <= 0) {
-        throw new Error("Invalid amount");
-      }
+  // -- Write contract for borrow --
+  const {
+    writeContract,
+    data: hash,
+    isPending,
+    error: writeError,
+    reset: resetWrite,
+  } = useWriteContract();
 
-      // Mock: simulate borrow transaction
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+  } = useWaitForTransactionReceipt({ hash });
 
-      const mockHash =
-        "0x" +
-        Array.from({ length: 64 }, () =>
-          Math.floor(Math.random() * 16).toString(16)
-        ).join("");
+  // -- State machine transitions --
 
-      setTxHash(mockHash);
+  // Transaction confirmed
+  useEffect(() => {
+    if (isConfirmed && status === "borrowing") {
       setStatus("confirmed");
-    } catch {
+    }
+  }, [isConfirmed, status]);
+
+  // Transaction error
+  useEffect(() => {
+    if (writeError && status === "borrowing") {
       setStatus("error");
       setErrorMessage(
         "Borrow failed. No USDC was transferred. Check your collateral balance and try again."
       );
     }
-  }, []);
+  }, [writeError, status]);
+
+  // -- Actions --
+
+  const borrow = useCallback(
+    (amount: string) => {
+      if (!address) {
+        setStatus("error");
+        setErrorMessage("Wallet not connected.");
+        return;
+      }
+
+      if (!amount || parseFloat(amount) <= 0) {
+        setStatus("error");
+        setErrorMessage("Invalid borrow amount.");
+        return;
+      }
+
+      setStatus("borrowing");
+      setErrorMessage(null);
+
+      writeContract({
+        address: CHARIOT_ADDRESSES.LENDING_POOL,
+        abi: LendingPoolABI,
+        functionName: "borrow",
+        args: [
+          CHARIOT_ADDRESSES.BRIDGED_ETH,
+          parseUnits(amount, 6),
+          [], // priceUpdates -- empty array, admin-set oracle
+        ],
+      });
+    },
+    [address, writeContract]
+  );
 
   const reset = useCallback(() => {
     setStatus("idle");
-    setTxHash(null);
     setErrorMessage(null);
-  }, []);
+    resetWrite();
+  }, [resetWrite]);
 
-  return { status, txHash, errorMessage, borrow, reset };
+  return { status, txHash: hash ?? null, errorMessage, borrow, reset };
 }
