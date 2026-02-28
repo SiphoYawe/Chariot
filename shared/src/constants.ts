@@ -23,7 +23,7 @@ export const POLLING_INTERVAL_MS = 12_000; // ~1 Arc block
 // Oracle configuration
 export const STALENESS_THRESHOLD_SECONDS = 3600;
 
-// Stork Oracle Feed IDs
+// Oracle Feed IDs (SimpleOracle -- admin-controlled IStork-compatible oracle)
 export const FEED_IDS = {
   ETHUSD: "0x59102b37de83bdda9f38ac8254e596f0d9ac61d2035c07936675e87342817160",
   ETHUSD_VGK: "", // Phase 2

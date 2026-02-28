@@ -1,8 +1,6 @@
 // Contract ABIs -- populated after contract compilation
 // Import pattern: import { ChariotVaultABI } from "@chariot/shared"
 
-// Minimal ABIs for frontend hooks -- full ABIs from forge build later
-
 export const ChariotVaultABI = [
   {
     type: "function",
@@ -20,12 +18,90 @@ export const ChariotVaultABI = [
   },
   {
     type: "function",
+    name: "totalSupply",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "convertToAssets",
+    inputs: [{ name: "shares", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "convertToShares",
+    inputs: [{ name: "assets", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "previewDeposit",
+    inputs: [{ name: "assets", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "previewWithdraw",
+    inputs: [{ name: "assets", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "maxWithdraw",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "maxDeposit",
+    inputs: [{ name: "receiver", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "deposit",
     inputs: [
       { name: "assets", type: "uint256" },
       { name: "receiver", type: "address" },
     ],
     outputs: [{ name: "shares", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "withdraw",
+    inputs: [
+      { name: "assets", type: "uint256" },
+      { name: "receiver", type: "address" },
+      { name: "owner", type: "address" },
+    ],
+    outputs: [{ name: "shares", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "redeem",
+    inputs: [
+      { name: "shares", type: "uint256" },
+      { name: "receiver", type: "address" },
+      { name: "owner", type: "address" },
+    ],
+    outputs: [{ name: "assets", type: "uint256" }],
     stateMutability: "nonpayable",
   },
   {
@@ -45,6 +121,41 @@ export const ChariotVaultABI = [
     ],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "pure",
+  },
+  {
+    type: "function",
+    name: "asset",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "circuitBreakerLevel",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+  },
+  {
+    type: "event",
+    name: "Deposit",
+    inputs: [
+      { name: "sender", type: "address", indexed: true },
+      { name: "owner", type: "address", indexed: true },
+      { name: "assets", type: "uint256", indexed: false },
+      { name: "shares", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Withdraw",
+    inputs: [
+      { name: "sender", type: "address", indexed: true },
+      { name: "receiver", type: "address", indexed: true },
+      { name: "owner", type: "address", indexed: true },
+      { name: "assets", type: "uint256", indexed: false },
+      { name: "shares", type: "uint256", indexed: false },
+    ],
   },
 ] as const;
 
@@ -76,6 +187,27 @@ export const LendingPoolABI = [
   {
     type: "function",
     name: "getTotalBorrowed",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTotalReserves",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getLastAccrualTimestamp",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getGlobalInterestIndex",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
@@ -118,6 +250,25 @@ export const LendingPoolABI = [
     outputs: [],
     stateMutability: "nonpayable",
   },
+  {
+    type: "event",
+    name: "Borrowed",
+    inputs: [
+      { name: "borrower", type: "address", indexed: true },
+      { name: "collateralToken", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "healthFactor", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Repaid",
+    inputs: [
+      { name: "borrower", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "remainingDebt", type: "uint256", indexed: false },
+    ],
+  },
 ] as const;
 
 export const CollateralManagerABI = [
@@ -133,6 +284,41 @@ export const CollateralManagerABI = [
   },
   {
     type: "function",
+    name: "getCollateralValueView",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getETHPrice",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getEffectiveLTV",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getLiquidationThreshold",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getBridgedETH",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "getHealthFactor",
     inputs: [
       { name: "user", type: "address" },
@@ -143,10 +329,13 @@ export const CollateralManagerABI = [
   },
   {
     type: "function",
-    name: "getEffectiveLTV",
-    inputs: [],
+    name: "getCollateralValue",
+    inputs: [
+      { name: "user", type: "address" },
+      { name: "priceUpdates", type: "tuple[]", components: [] },
+    ],
     outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "pure",
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -169,14 +358,22 @@ export const CollateralManagerABI = [
     stateMutability: "nonpayable",
   },
   {
-    type: "function",
-    name: "getCollateralValue",
+    type: "event",
+    name: "CollateralDeposited",
     inputs: [
-      { name: "user", type: "address" },
-      { name: "priceUpdates", type: "tuple[]", components: [] },
+      { name: "user", type: "address", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
     ],
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "nonpayable",
+  },
+  {
+    type: "event",
+    name: "CollateralWithdrawn",
+    inputs: [
+      { name: "user", type: "address", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
   },
 ] as const;
 
@@ -233,6 +430,13 @@ export const InterestRateModelABI = [
     type: "function",
     name: "getVolatilityPremium",
     inputs: [{ name: "collateralToken", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getReserveFactor",
+    inputs: [],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
@@ -302,7 +506,7 @@ export const BridgedETHABI = [
   },
 ] as const;
 
-export const StorkOracleABI = [
+export const SimpleOracleABI = [
   {
     type: "function",
     name: "getTemporalNumericValueV1",
@@ -319,9 +523,67 @@ export const StorkOracleABI = [
     ],
     stateMutability: "view",
   },
+  {
+    type: "function",
+    name: "setPriceNow",
+    inputs: [
+      { name: "id", type: "bytes32" },
+      { name: "value", type: "int192" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "setPrice",
+    inputs: [
+      { name: "id", type: "bytes32" },
+      { name: "value", type: "int192" },
+      { name: "timestampNs", type: "uint64" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
 ] as const;
 
-export const LiquidationEngineABI = [] as const;
+// Keep StorkOracleABI as alias for backward compatibility
+export const StorkOracleABI = SimpleOracleABI;
+
+export const LiquidationEngineABI = [
+  {
+    type: "function",
+    name: "isLiquidatable",
+    inputs: [{ name: "borrower", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "calculateLiquidationBonus",
+    inputs: [{ name: "healthFactor", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getLiquidationThreshold",
+    inputs: [{ name: "collateralToken", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "event",
+    name: "PositionLiquidated",
+    inputs: [
+      { name: "borrower", type: "address", indexed: true },
+      { name: "liquidator", type: "address", indexed: true },
+      { name: "collateralToken", type: "address", indexed: true },
+      { name: "debtRepaid", type: "uint256", indexed: false },
+      { name: "collateralSeized", type: "uint256", indexed: false },
+      { name: "bonus", type: "uint256", indexed: false },
+    ],
+  },
+] as const;
 
 export const RiskParameterEngineABI = [
   {
@@ -472,6 +734,20 @@ export const ERC20ABI = [
     name: "decimals",
     inputs: [],
     outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "symbol",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "totalSupply",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
 ] as const;
