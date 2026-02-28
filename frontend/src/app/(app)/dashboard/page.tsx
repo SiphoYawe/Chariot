@@ -4,10 +4,12 @@ import { ProtocolHealthGrid } from "@/components/data/ProtocolHealthGrid";
 import { YieldDisplay } from "@/components/vault/YieldDisplay";
 import { BorrowRateDisplay } from "@/components/vault/BorrowRateDisplay";
 import { OracleDataDisplay } from "@/components/vault/OracleDataDisplay";
-import { RateTable } from "@/components/vault/RateTable";
 import { CircuitBreakerBanner } from "@/components/feedback/CircuitBreakerBanner";
 import { UtilisationBar } from "@/components/vault/UtilisationBar";
 import { DashboardLenderPosition } from "@/components/collateral/DashboardLenderPosition";
+import { VaultCompositionChart } from "@/components/charts/VaultCompositionChart";
+import { UtilisationHistoryChart } from "@/components/charts/UtilisationHistoryChart";
+import { UtilisationCurveChart } from "@/components/charts/UtilisationCurveChart";
 
 export default function DashboardPage() {
   return (
@@ -41,6 +43,17 @@ export default function DashboardPage() {
         <UtilisationBar />
       </section>
 
+      {/* Vault Composition & Utilisation History Charts */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <VaultCompositionChart />
+        <UtilisationHistoryChart />
+      </section>
+
+      {/* Interactive Rate Curve */}
+      <section className="mb-8">
+        <UtilisationCurveChart />
+      </section>
+
       {/* Oracle Data */}
       <section className="mb-8">
         <h2 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-[#023436] mb-4">
@@ -55,14 +68,6 @@ export default function DashboardPage() {
           Protocol Health
         </h2>
         <ProtocolHealthGrid />
-      </section>
-
-      {/* Rate Table */}
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-[#023436] mb-4">
-          Rate Schedule
-        </h2>
-        <RateTable />
       </section>
     </div>
   );
