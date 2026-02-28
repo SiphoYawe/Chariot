@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Transaction } from "@/types/transaction";
 import { TransactionRow } from "./TransactionRow";
 
@@ -43,6 +43,8 @@ interface DateGroupedListProps {
 }
 
 export function DateGroupedList({ transactions }: DateGroupedListProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   const groups = useMemo(() => {
     const groupMap = new Map<string, DateGroup>();
     const sorted = [...transactions].sort((a, b) => b.timestamp - a.timestamp);
@@ -67,7 +69,14 @@ export function DateGroupedList({ transactions }: DateGroupedListProps) {
           </h3>
           <div className="border border-[rgba(3,121,113,0.15)] bg-white">
             {group.transactions.map((tx) => (
-              <TransactionRow key={tx.id} transaction={tx} />
+              <TransactionRow
+                key={tx.id}
+                transaction={tx}
+                expanded={expandedId === tx.id}
+                onToggle={() =>
+                  setExpandedId(expandedId === tx.id ? null : tx.id)
+                }
+              />
             ))}
           </div>
         </div>

@@ -11,9 +11,11 @@ import {
   AlertDiamondIcon,
   ArrowDataTransferHorizontalIcon,
 } from "@hugeicons/core-free-icons";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { IconSvgElement } from "@hugeicons/react";
 import type { Transaction, TransactionType } from "@/types/transaction";
 import { TRANSACTION_TYPE_LABELS } from "@/types/transaction";
+import { TransactionDetail } from "./TransactionDetail";
 
 const TYPE_ICONS: Record<TransactionType, IconSvgElement> = {
   deposit: ArrowDown01Icon,
@@ -68,40 +70,62 @@ function formatAmount(amount: number, asset: string): string {
 
 interface TransactionRowProps {
   transaction: Transaction;
+  expanded: boolean;
+  onToggle: () => void;
 }
 
-export function TransactionRow({ transaction }: TransactionRowProps) {
+export function TransactionRow({
+  transaction,
+  expanded,
+  onToggle,
+}: TransactionRowProps) {
   const icon = TYPE_ICONS[transaction.type];
   const label = TRANSACTION_TYPE_LABELS[transaction.type];
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3 border-b border-[rgba(3,121,113,0.15)] last:border-b-0 hover:bg-[#F8FAFA] transition-colors">
-      {/* Icon */}
-      <div className="w-9 h-9 flex items-center justify-center bg-[#F8FAFA] shrink-0">
-        <HugeiconsIcon icon={icon} size={18} className="text-[#037971]" />
-      </div>
-
-      {/* Type & timestamp */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-[#023436]">{label}</p>
-        <p className="text-xs text-[#6B8A8D]">
-          {formatTimestamp(transaction.timestamp)}
-        </p>
-      </div>
-
-      {/* Amount */}
-      <div className="text-right">
-        <p className="text-sm font-medium tabular-nums font-[family-name:var(--font-heading)] text-[#023436]">
-          {formatAmount(transaction.amount, transaction.asset)}
-        </p>
-      </div>
-
-      {/* Status badge */}
-      <span
-        className={`px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[transaction.status]}`}
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center gap-4 px-4 py-3 border-b border-[rgba(3,121,113,0.15)] last:border-b-0 hover:bg-[#F8FAFA] transition-colors text-left"
       >
-        {transaction.status}
-      </span>
+        {/* Icon */}
+        <div className="w-9 h-9 flex items-center justify-center bg-[#F8FAFA] shrink-0">
+          <HugeiconsIcon icon={icon} size={18} className="text-[#037971]" />
+        </div>
+
+        {/* Type & timestamp */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-[#023436]">{label}</p>
+          <p className="text-xs text-[#6B8A8D]">
+            {formatTimestamp(transaction.timestamp)}
+          </p>
+        </div>
+
+        {/* Amount */}
+        <div className="text-right">
+          <p className="text-sm font-medium tabular-nums font-[family-name:var(--font-heading)] text-[#023436]">
+            {formatAmount(transaction.amount, transaction.asset)}
+          </p>
+        </div>
+
+        {/* Status badge */}
+        <span
+          className={`px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[transaction.status]}`}
+        >
+          {transaction.status}
+        </span>
+
+        {/* Chevron */}
+        {expanded ? (
+          <ChevronUp size={16} className="text-[#6B8A8D] shrink-0" />
+        ) : (
+          <ChevronDown size={16} className="text-[#6B8A8D] shrink-0" />
+        )}
+      </button>
+
+      {/* Expanded detail */}
+      {expanded && <TransactionDetail transaction={transaction} />}
     </div>
   );
 }

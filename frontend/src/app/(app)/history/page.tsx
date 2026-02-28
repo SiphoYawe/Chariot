@@ -1,8 +1,14 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DateGroupedList } from "@/components/activity/DateGroupedList";
+import {
+  TransactionFilterBar,
+  FILTER_TYPE_MAP,
+  type FilterOption,
+} from "@/components/activity/TransactionFilterBar";
 import { useTransactionHistory } from "@/hooks/useTransactionHistory";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,13 +70,62 @@ function NoTransactions() {
   );
 }
 
+function NoFilterResults({
+  filter,
+  onClear,
+}: {
+  filter: FilterOption;
+  onClear: () => void;
+}) {
+  const labels: Record<FilterOption, string> = {
+    all: "",
+    deposits: "deposit",
+    withdrawals: "withdrawal",
+    borrows: "borrow",
+    repays: "repay",
+    liquidations: "liquidation",
+    bridge: "bridge",
+  };
+
+  return (
+    <div className="border border-[rgba(3,121,113,0.15)] bg-white p-8 flex flex-col items-center text-center">
+      <p className="text-sm text-[#6B8A8D] mb-4">
+        No {labels[filter]} transactions found
+      </p>
+      <button
+        onClick={onClear}
+        className="text-sm font-medium text-[#03B5AA] hover:text-[#037971] transition-colors"
+      >
+        Clear filter
+      </button>
+    </div>
+  );
+}
+
 export default function HistoryPage() {
   const { data, isLoading, isError, refetch } = useTransactionHistory();
+  const [activeFilter, setActiveFilter] = useState<FilterOption>("all");
+
+  const filteredTransactions = useMemo(() => {
+    if (!data) return null;
+    const allowedTypes = FILTER_TYPE_MAP[activeFilter];
+    if (!allowedTypes) return data;
+    return data.filter((tx) => allowedTypes.includes(tx.type));
+  }, [data, activeFilter]);
 
   return (
     <div className="pb-12">
       <PageHeader title="Transaction History" />
 
+      {/* Filter bar */}
+      <section className="mb-6">
+        <TransactionFilterBar
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+        />
+      </section>
+
+      {/* Transaction list */}
       <section>
         {isLoading ? (
           <TransactionSkeletons />
@@ -79,8 +134,13 @@ export default function HistoryPage() {
             message="Unable to load transaction history. Click retry to try again."
             onRetry={refetch}
           />
+        ) : filteredTransactions && filteredTransactions.length > 0 ? (
+          <DateGroupedList transactions={filteredTransactions} />
         ) : data && data.length > 0 ? (
-          <DateGroupedList transactions={data} />
+          <NoFilterResults
+            filter={activeFilter}
+            onClear={() => setActiveFilter("all")}
+          />
         ) : (
           <NoTransactions />
         )}
