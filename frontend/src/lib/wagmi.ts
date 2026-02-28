@@ -1,4 +1,4 @@
-import { http, createConfig } from "wagmi";
+import { http, fallback, createConfig } from "wagmi";
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import {
   metaMaskWallet,
@@ -79,7 +79,9 @@ export const config = createConfig({
   connectors,
   chains: [arcTestnet, ethereumSepolia],
   transports: {
-    [arcTestnet.id]: http(arcTestnet.rpcUrls.default.http[0]),
+    [arcTestnet.id]: fallback(
+      arcTestnet.rpcUrls.default.http.map((url) => http(url))
+    ),
     [ethereumSepolia.id]: http(ethereumSepolia.rpcUrls.default.http[0]),
   },
   ssr: true,
