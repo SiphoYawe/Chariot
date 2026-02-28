@@ -1,10 +1,26 @@
 "use client";
 
 import { useOraclePrice } from "@/hooks/useOraclePrice";
+import { useRiskParameters } from "@/hooks/useRiskParameters";
 import { useEffect, useState } from "react";
+
+function getVolatilityStatus(vol: number): { label: string; colorClass: string } {
+  if (vol <= 0.25) return { label: "Normal", colorClass: "text-[#023436]" };
+  if (vol <= 0.40) return { label: "Elevated", colorClass: "text-[#037971]" };
+  if (vol <= 0.60) return { label: "High", colorClass: "text-[#F59E0B]" };
+  return { label: "Extreme", colorClass: "text-[#DC2626]" };
+}
+
+function getVolatilityBgClass(vol: number): string {
+  if (vol <= 0.25) return "bg-[#F8FAFA] border-[rgba(3,121,113,0.15)]";
+  if (vol <= 0.40) return "bg-[rgba(3,121,113,0.06)] border-[rgba(3,121,113,0.2)]";
+  if (vol <= 0.60) return "bg-[rgba(245,158,11,0.06)] border-[rgba(245,158,11,0.2)]";
+  return "bg-[rgba(220,38,38,0.06)] border-[rgba(220,38,38,0.2)]";
+}
 
 export function OracleDataDisplay() {
   const { data, isLoading, isError, refetch } = useOraclePrice();
+  const { data: riskData, isLoading: riskLoading } = useRiskParameters();
   const [timeSince, setTimeSince] = useState<string>("--");
   const [stalenessColorClass, setStalenessColorClass] = useState<string>("text-[#9CA3AF]");
 
@@ -24,6 +40,9 @@ export function OracleDataDisplay() {
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [data]);
+
+  const volStatus = riskData ? getVolatilityStatus(riskData.currentVolatility) : null;
+  const volBgClass = riskData ? getVolatilityBgClass(riskData.currentVolatility) : "";
 
   return (
     <div className="grid grid-cols-3 gap-6">
@@ -46,11 +65,31 @@ export function OracleDataDisplay() {
         )}
       </div>
       <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
-        <p className="text-sm text-[#6B8A8D] mb-1">Volatility (EMA GK)</p>
-        <p className="text-2xl font-semibold font-[family-name:var(--font-heading)] tabular-nums mt-1 text-[#9CA3AF]">--</p>
-        <span className="text-xs bg-[#F8FAFA] border border-[rgba(3,121,113,0.15)] px-2 py-0.5 text-[#9CA3AF] inline-block mt-1">
-          Phase 2
-        </span>
+        <p className="text-sm text-[#6B8A8D] mb-1">ETH Volatility (EMA)</p>
+        {riskLoading ? (
+          <>
+            <div className="h-8 w-24 bg-[#F8FAFA] animate-pulse mt-1" />
+            <div className="h-4 w-16 bg-[#F8FAFA] animate-pulse mt-2" />
+          </>
+        ) : riskData?.isEngineAvailable ? (
+          <>
+            <p className="text-2xl font-semibold font-[family-name:var(--font-heading)] tabular-nums mt-1 text-[#023436]">
+              {(riskData.currentVolatility * 100).toFixed(1)}%
+            </p>
+            <span
+              className={`text-xs border px-2 py-0.5 inline-block mt-1 ${volBgClass} ${volStatus?.colorClass}`}
+            >
+              {volStatus?.label}
+            </span>
+          </>
+        ) : (
+          <>
+            <p className="text-2xl font-semibold font-[family-name:var(--font-heading)] tabular-nums mt-1 text-[#9CA3AF]">--</p>
+            <span className="text-xs bg-[#F8FAFA] border border-[rgba(3,121,113,0.15)] px-2 py-0.5 text-[#9CA3AF] inline-block mt-1">
+              Unavailable
+            </span>
+          </>
+        )}
       </div>
       <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
         <p className="text-sm text-[#6B8A8D] mb-1">Oracle Source</p>

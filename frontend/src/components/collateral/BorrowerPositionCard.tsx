@@ -2,6 +2,7 @@
 
 import { HealthFactorGauge } from "@/components/risk/HealthFactorGauge";
 import { CollateralLockStatus } from "@/components/borrow/CollateralLockStatus";
+import { LTVDisplay } from "@/components/ui/LTVDisplay";
 import { cn } from "@/lib/utils";
 
 interface BorrowerPositionCardProps {
@@ -17,6 +18,12 @@ interface BorrowerPositionCardProps {
   interestAccrued: number;
   /** Effective LTV (0-1) */
   effectiveLtv: number;
+  /** Base LTV before volatility adjustment (0-1) */
+  baseLtv?: number;
+  /** Liquidation threshold (0-1) */
+  liquidationThreshold?: number;
+  /** Whether RiskParameterEngine is available */
+  isEngineAvailable?: boolean;
   /** Health factor */
   healthFactor: number;
   /** Liquidation price (ETH) */
@@ -34,10 +41,6 @@ function formatUsd(n: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-}
-
-function formatPercent(n: number): string {
-  return (n * 100).toFixed(2) + "%";
 }
 
 function DataRow({
@@ -71,6 +74,9 @@ export function BorrowerPositionCard({
   principal,
   interestAccrued,
   effectiveLtv,
+  baseLtv = 0.75,
+  liquidationThreshold = 0.82,
+  isEngineAvailable = true,
   healthFactor,
   liquidationPrice,
   maxAdditionalBorrow,
@@ -112,10 +118,16 @@ export function BorrowerPositionCard({
               />
             </>
           )}
-          <DataRow
-            label="Effective LTV"
-            value={formatPercent(effectiveLtv)}
-          />
+          {/* Dynamic LTV display */}
+          <div className="py-2">
+            <span className="text-xs text-[#6B8A8D] block mb-1">Effective LTV</span>
+            <LTVDisplay
+              effectiveLTV={effectiveLtv}
+              baseLTV={baseLtv}
+              liquidationThreshold={liquidationThreshold}
+              isEngineAvailable={isEngineAvailable}
+            />
+          </div>
           {hasDebt && (
             <DataRow
               label="Liquidation Price"

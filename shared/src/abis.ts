@@ -174,6 +174,37 @@ export const InterestRateModelABI = [
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "pure",
   },
+  {
+    type: "function",
+    name: "getRateBreakdown",
+    inputs: [
+      { name: "utilisation", type: "uint256" },
+      { name: "collateralToken", type: "address" },
+    ],
+    outputs: [
+      { name: "baseRate", type: "uint256" },
+      { name: "volatilityPremium", type: "uint256" },
+      { name: "totalRate", type: "uint256" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getBorrowRateWithVolatility",
+    inputs: [
+      { name: "utilisation", type: "uint256" },
+      { name: "collateralToken", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getVolatilityPremium",
+    inputs: [{ name: "collateralToken", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
 ] as const;
 
 export const ETHEscrowABI = [
@@ -260,7 +291,49 @@ export const StorkOracleABI = [
 ] as const;
 
 export const LiquidationEngineABI = [] as const;
-export const RiskParameterEngineABI = [] as const;
+
+export const RiskParameterEngineABI = [
+  {
+    type: "function",
+    name: "getRiskParameters",
+    inputs: [{ name: "collateralToken", type: "address" }],
+    outputs: [
+      { name: "effectiveLTV", type: "uint256" },
+      { name: "liquidationThreshold", type: "uint256" },
+      { name: "currentVolatility", type: "uint256" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getEffectiveLTV",
+    inputs: [{ name: "collateralToken", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getLiquidationThreshold",
+    inputs: [{ name: "collateralToken", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getCurrentVolatility",
+    inputs: [{ name: "collateralToken", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getBaseLTV",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+] as const;
+
 export const CircuitBreakerABI = [] as const;
 
 export const ERC20ABI = [

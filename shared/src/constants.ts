@@ -51,6 +51,15 @@ export const RISK_PARAMS = {
   },
 } as const;
 
+// Volatility risk parameters (Phase 2)
+export const VOLATILITY_PARAMS = {
+  BASELINE_VOLATILITY: 0.25, // 25% annualized
+  K_LTV: 0.5, // LTV sensitivity to volatility
+  K_VOL_ETH: 0.5, // Borrow rate sensitivity (WAD: 50e16)
+  MIN_LTV_FLOOR: 0.30, // 30% absolute minimum LTV
+  LIQUIDATION_BUFFER: 0.07, // 7% above effective LTV
+} as const;
+
 // Agent configuration
 export const AGENT_CONFIG = {
   MONITORING_INTERVAL_MS: 60_000, // 60 seconds
