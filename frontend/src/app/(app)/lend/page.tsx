@@ -19,6 +19,8 @@ import { useVaultWithdraw } from "@/hooks/useVaultWithdraw";
 import { PositionCard } from "@/components/collateral/PositionCard";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { useLenderPosition } from "@/hooks/useLenderPosition";
+import { EarningsCounter } from "@/components/vault/EarningsCounter";
+import { SharePriceDisplay } from "@/components/vault/SharePriceDisplay";
 import { Loading03Icon, CoinsSwapIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
@@ -494,6 +496,12 @@ export default function LendPage() {
       {/* Vault stats summary */}
       <section className="mb-8">
         <VaultStats />
+      </section>
+
+      {/* Real-time earnings & share price */}
+      <section className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-[520px]">
+        <EarningsCounter />
+        <SharePriceDisplay />
       </section>
 
       {/* Lender position or empty state */}
