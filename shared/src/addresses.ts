@@ -13,15 +13,15 @@ export const ADDRESSES = {
 
 // Chariot protocol addresses (populated after deployment)
 export const CHARIOT_ADDRESSES = {
-  CHARIOT_VAULT: "" as `0x${string}`,
-  LENDING_POOL: "" as `0x${string}`,
-  COLLATERAL_MANAGER: "" as `0x${string}`,
-  INTEREST_RATE_MODEL: "" as `0x${string}`,
-  LIQUIDATION_ENGINE: "" as `0x${string}`,
-  RISK_PARAMETER_ENGINE: "" as `0x${string}`,
+  CHARIOT_VAULT: "0x21dBa2FDC65E4910a2C34147929294f88c2D8E43" as `0x${string}`,
+  LENDING_POOL: "0xD00FbD24E77C902F5224981d6c5cA3e1F9EfB318" as `0x${string}`,
+  COLLATERAL_MANAGER: "0xeb5343dDDb1Ab728636931c5Ade7B82Af6aca4A6" as `0x${string}`,
+  INTEREST_RATE_MODEL: "0x2AFF3e043f8677752aA8FDF2be6cFD1F6408De1c" as `0x${string}`,
+  LIQUIDATION_ENGINE: "0xDd8C98E2D0dC38385094CC85cfCf94e422ff9472" as `0x${string}`,
+  RISK_PARAMETER_ENGINE: "0x28F88F70fBc07c45C143d1Bc3dBAc426C14Ce4eA" as `0x${string}`,
   CIRCUIT_BREAKER: "" as `0x${string}`,
-  ETH_ESCROW: "" as `0x${string}`,
-  BRIDGED_ETH: "" as `0x${string}`,
+  ETH_ESCROW: "0x42cAA0a88A42b92e1307E625e5253BE0dFABcCc2" as `0x${string}`,
+  BRIDGED_ETH: "0x42cAA0a88A42b92e1307E625e5253BE0dFABcCc2" as `0x${string}`,
   CCTP_BRIDGE: "" as `0x${string}`,
 } as const;
 
