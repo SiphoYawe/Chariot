@@ -587,8 +587,8 @@ export default function LendPage() {
             </div>
 
             {/* Right column -- Action Panel */}
-            <div>
-              <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6 sticky top-6">
+            <div className="self-start">
+              <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6 sticky top-6 min-h-[460px]">
                 <Tabs defaultValue="deposit">
                   <TabsList
                     variant="line"

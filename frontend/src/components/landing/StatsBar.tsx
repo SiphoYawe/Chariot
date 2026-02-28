@@ -8,7 +8,7 @@ const stats = [
 export function StatsBar() {
   return (
     <section className="bg-[#023436]">
-      <div className="max-w-[1200px] mx-auto px-8 py-8 grid grid-cols-4 gap-8">
+      <div className="max-w-[1200px] mx-auto px-8 py-20 grid grid-cols-4 gap-8">
         {stats.map((stat) => (
           <div key={stat.label} className="text-center">
             <p className="tabular-nums text-4xl font-bold text-white mb-2">

@@ -27,7 +27,7 @@ export function KPICard({
           {label}
         </p>
         {sparkData && sparkData.length >= 2 && !loading && (
-          <SparkChart data={sparkData} color={sparkColor} width={64} height={20} />
+          <SparkChart data={sparkData} color={sparkColor} width={96} height={32} />
         )}
       </div>
       {loading ? (

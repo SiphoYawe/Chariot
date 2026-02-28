@@ -21,8 +21,8 @@ interface SparkChartProps {
 export function SparkChart({
   data,
   color = "#03B5AA",
-  width = 80,
-  height = 24,
+  width = 96,
+  height = 32,
 }: SparkChartProps) {
   const gradientId = useId();
 

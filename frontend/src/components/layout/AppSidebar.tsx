@@ -64,20 +64,20 @@ function WalletStatus() {
     <div className="px-6 py-4 border-t border-white/10">
       {isConnected && address ? (
         <>
-          <p className="text-xs text-white/70 font-mono truncate">
+          <p className="text-sm text-white font-mono tracking-wide truncate">
             {address.slice(0, 6)}...{address.slice(-4)}
           </p>
-          <div className="flex items-center gap-1.5 mt-1">
+          <div className="flex items-center gap-1.5 mt-1.5">
             <span className={`w-1.5 h-1.5 ${isCorrectNetwork ? "bg-[#10B981]" : "bg-[#F59E0B]"}`} />
-            <p className="text-xs text-white/50">
+            <p className="text-xs text-white/70">
               {isCorrectNetwork ? "Arc Testnet" : "Wrong Network"}
             </p>
           </div>
         </>
       ) : (
         <>
-          <p className="text-xs text-white/60">Chariot Protocol</p>
-          <p className="text-xs text-white/50">Arc Testnet</p>
+          <p className="text-sm text-white/80">Chariot Protocol</p>
+          <p className="text-xs text-white/60">Arc Testnet</p>
         </>
       )}
     </div>

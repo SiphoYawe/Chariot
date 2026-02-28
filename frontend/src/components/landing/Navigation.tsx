@@ -10,8 +10,8 @@ const navLinks = [
 export function Navigation() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-[rgba(3,121,113,0.15)]">
-      <div className="max-w-[1200px] mx-auto px-8 flex items-center justify-between h-16">
-        <Link href="/" className="flex-shrink-0">
+      <div className="max-w-[1200px] mx-auto px-8 grid grid-cols-3 items-center h-16">
+        <Link href="/" className="flex-shrink-0 justify-self-start">
           <Image
             src="/chariot-dark.svg"
             alt="Chariot"
@@ -21,7 +21,7 @@ export function Navigation() {
           />
         </Link>
 
-        <nav className="flex items-center gap-8">
+        <nav className="flex items-center justify-center gap-8">
           {navLinks.map((link) => (
             <Link
               key={link.name}
@@ -33,7 +33,7 @@ export function Navigation() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 justify-self-end">
           <Link
             href="/lend"
             className="inline-flex items-center justify-center h-9 px-5 text-[15px] font-semibold text-white bg-[#03B5AA] hover:bg-[#037971] transition-colors"
