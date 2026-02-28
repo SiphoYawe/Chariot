@@ -23,6 +23,8 @@ import { EarningsCounter } from "@/components/vault/EarningsCounter";
 import { SharePriceDisplay } from "@/components/vault/SharePriceDisplay";
 import { UtilisationBar } from "@/components/vault/UtilisationBar";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
+import { YieldHistoryChart } from "@/components/charts/YieldHistoryChart";
+import { SharePriceChart } from "@/components/charts/SharePriceChart";
 import { Loading03Icon, CoinsSwapIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
@@ -525,6 +527,12 @@ export default function LendPage() {
       {/* Lender position or empty state */}
       <section className="mb-8 max-w-[520px]">
         <LenderPositionSection />
+      </section>
+
+      {/* Yield & Share Price Charts */}
+      <section className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <YieldHistoryChart />
+        <SharePriceChart />
       </section>
 
       {/* Utilisation bar */}

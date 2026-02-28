@@ -1,4 +1,7 @@
+"use client";
+
 import { Skeleton } from "@/components/ui/skeleton";
+import { SparkChart } from "@/components/charts/SparkChart";
 
 interface DataCardProps {
   label: string;
@@ -9,12 +12,19 @@ interface DataCardProps {
   error?: boolean;
   onRetry?: () => void;
   accent?: boolean;
+  sparkData?: number[];
+  sparkColor?: string;
 }
 
-export function DataCard({ label, value, unit, subtitle, loading, error, onRetry, accent }: DataCardProps) {
+export function DataCard({ label, value, unit, subtitle, loading, error, onRetry, accent, sparkData, sparkColor }: DataCardProps) {
   return (
     <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
-      <p className="text-sm text-[#6B8A8D] mb-1">{label}</p>
+      <div className="flex items-start justify-between">
+        <p className="text-sm text-[#6B8A8D] mb-1">{label}</p>
+        {sparkData && sparkData.length >= 2 && !loading && !error && (
+          <SparkChart data={sparkData} color={sparkColor} />
+        )}
+      </div>
       {loading ? (
         <Skeleton className="h-8 w-32 mt-1" />
       ) : error ? (
