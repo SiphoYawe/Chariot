@@ -93,8 +93,8 @@ export function OracleDataDisplay() {
       </div>
       <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
         <p className="text-sm text-[#6B8A8D] mb-1">Oracle Source</p>
-        <p className="text-lg font-medium font-[family-name:var(--font-heading)] mt-1 text-[#023436]">Stork</p>
-        <p className="text-xs text-[#9CA3AF] mt-1">Pull-based oracle on Arc</p>
+        <p className="text-lg font-medium font-[family-name:var(--font-heading)] mt-1 text-[#023436]">SimpleOracle</p>
+        <p className="text-xs text-[#9CA3AF] mt-1">Admin-controlled oracle on Arc</p>
       </div>
     </div>
   );

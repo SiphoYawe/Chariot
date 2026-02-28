@@ -46,13 +46,13 @@ Total_Borrow_Rate = Utilisation_Rate + Volatility_Premium + Concentration_Premiu
 
 **Utilisation rate** uses an Aave V3-style kinked model with an optimal utilisation target of 80%. Below the kink, rates increase gently. Above the kink, rates spike aggressively to rebalance supply and demand.
 
-**Volatility premium** (Phase 2) charges higher rates for borrowing against volatile collateral, using Stork EMA Garman-Klass volatility feeds.
+**Volatility premium** (Phase 2) charges higher rates for borrowing against volatile collateral, using oracle EMA Garman-Klass volatility feeds.
 
 **Concentration premium** (Phase 3) charges higher rates when a single collateral type exceeds 40% of total collateral value.
 
 ### Volatility-Adjusted Risk Parameters
 
-LTV ratios and liquidation thresholds adjust dynamically based on real-time Stork oracle volatility feeds:
+LTV ratios and liquidation thresholds adjust dynamically based on real-time oracle volatility feeds:
 
 ```
 Effective_LTV = Base_LTV - (k_ltv * max(0, Current_Vol - Baseline_Vol))
@@ -80,7 +80,7 @@ Positions with a health factor below 1.0 are liquidatable:
 Health_Factor = (Collateral_Value * Liquidation_Threshold) / Debt_Value
 ```
 
-Liquidators fetch fresh signed prices from Stork's API and submit them as part of the liquidation transaction. The price update and liquidation execute atomically -- zero staleness. Liquidation bonuses scale from 5% to 10% based on how underwater the position is.
+Liquidators submit liquidation transactions using the latest oracle prices. With SimpleOracle, prices are admin-set so no signed price data is needed. Liquidation bonuses scale from 5% to 10% based on how underwater the position is.
 
 ### Circuit Breakers
 
@@ -105,7 +105,7 @@ Borrowed USDC can be bridged from Arc to any CCTP-supported chain (Ethereum, Bas
 | Language | Solidity ^0.8.30 (Prague EVM target) |
 | Framework | Foundry (forge, cast, anvil) |
 | Standards | ERC-4626 (vault), ERC-20 (collateral tokens, USDC) |
-| Oracle SDK | `@storknetwork/stork-evm-sdk` |
+| Oracle | SimpleOracle (admin-controlled IStork-compatible) |
 | Network | Arc Testnet (Chain ID: 5042002) |
 
 ### Backend
@@ -114,7 +114,7 @@ Borrowed USDC can be bridged from Arc to any CCTP-supported chain (Ethereum, Bas
 |-----------|-----------|
 | Runtime | Node.js / TypeScript |
 | Circle SDK | `@circle-fin/smart-contract-platform`, `@circle-fin/w3s` |
-| Oracle Data | Stork REST API + WebSocket |
+| Oracle Data | SimpleOracle (admin-set prices via agent) |
 | Wallet Management | Circle Developer-Controlled Wallets |
 | Gas Sponsoring | Circle Gas Station (ERC-4337) |
 
@@ -135,14 +135,14 @@ Borrowed USDC can be bridged from Arc to any CCTP-supported chain (Ethereum, Bas
 | **CollateralManager** | Holds borrower collateral. Tracks per-user balances. Calculates health factors using oracle prices and dynamic risk parameters. |
 | **LiquidationEngine** | Verifies health factor < 1.0, calculates bonus, transfers collateral to liquidator, reduces borrower debt. |
 | **InterestRateModel** | Computes borrow rate from utilisation + volatility + concentration inputs. |
-| **RiskParameterEngine** | Reads Stork volatility feeds. Computes effective LTV and liquidation threshold per collateral type. |
+| **RiskParameterEngine** | Reads oracle volatility feeds. Computes effective LTV and liquidation threshold per collateral type. |
 | **CircuitBreaker** | Monitors protocol metrics. Enforces withdrawal rate limits and borrow pauses. |
 | **ETHEscrow** | Lock contract for native ETH on Ethereum Sepolia with timeout-based refunds. |
 | **BridgedETH** | ERC-20 on Arc minted by relayer, burnable for ETH release on Ethereum. |
 
-## Oracle Integration (Stork)
+## Oracle Integration (SimpleOracle)
 
-Stork operates as a pull oracle on Arc (`0xacC0a0cF13571d30B4b8637996F5D6D774d4fd62`). Data is only written on-chain when a transaction needs it.
+Chariot uses SimpleOracle (`0xef2eD9f23E7dc480c7be7C59Fa5D50C7C901e178`) -- an admin-controlled oracle implementing the IStork interface. Prices are set by the protocol admin or automated agent via `setPriceNow(feedId, price)`. No API key or signed data required.
 
 | Feed | Purpose | Phase |
 |------|---------|-------|
@@ -151,7 +151,7 @@ Stork operates as a pull oracle on Arc (`0xacC0a0cF13571d30B4b8637996F5D6D774d4f
 | `BTCUSD`, `SOLUSD` | Future collateral pricing | Phase 3 |
 | `BTCUSD_VGK`, `SOLUSD_VGK` | Future multi-collateral risk parameters | Phase 3 |
 
-Stork's EMA Garman-Klass volatility estimator incorporates intraperiod price range (high-low) for more accurate volatility measurement than close-to-close calculations.
+The EMA Garman-Klass volatility estimator incorporates intraperiod price range (high-low) for more accurate volatility measurement than close-to-close calculations.
 
 ## Key Contract Addresses (Arc Testnet)
 
@@ -160,7 +160,7 @@ Stork's EMA Garman-Klass volatility estimator incorporates intraperiod price ran
 | USDC | `0x3600000000000000000000000000000000000000` |
 | USYC | `0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C` |
 | USYC Teller | `0x9fdF14c5B14173D74C08Af27AebFf39240dC105A` |
-| Stork Oracle | `0xacC0a0cF13571d30B4b8637996F5D6D774d4fd62` |
+| SimpleOracle | `0xef2eD9f23E7dc480c7be7C59Fa5D50C7C901e178` |
 | CCTP TokenMessengerV2 | `0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA` |
 
 ## Key Formulas
