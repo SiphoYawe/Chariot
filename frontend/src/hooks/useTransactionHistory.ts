@@ -11,11 +11,21 @@ import {
 } from "@chariot/shared";
 import type { Transaction } from "@/types/transaction";
 
-const MAX_BLOCKS_BACK = BigInt(50_000);
+// ~3 days at Arc's ~0.5s block time
+const MAX_BLOCKS_BACK = BigInt(500_000);
+
+/**
+ * Case-insensitive address comparison for filtering events client-side.
+ */
+function addressMatch(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
+  return a.toLowerCase() === b.toLowerCase();
+}
 
 /**
  * Hook for fetching real on-chain transaction history from contract events.
- * Reads indexed events from ChariotVault, LendingPool, and CollateralManager.
+ * Reads events from ChariotVault, LendingPool, and CollateralManager,
+ * then filters client-side by the connected wallet address.
  * Always queries Arc Testnet regardless of which chain the wallet is connected to.
  */
 export function useTransactionHistory() {
@@ -36,16 +46,21 @@ export function useTransactionHistory() {
     try {
       setIsLoading(true);
       const currentBlock = await publicClient.getBlockNumber();
-      const fromBlock = currentBlock > MAX_BLOCKS_BACK ? currentBlock - MAX_BLOCKS_BACK : BigInt(0);
+      const fromBlock =
+        currentBlock > MAX_BLOCKS_BACK
+          ? currentBlock - MAX_BLOCKS_BACK
+          : BigInt(0);
 
-      // Fetch all event types in parallel
+      // Fetch all event types in parallel -- no args filtering so the RPC
+      // only needs to match by contract address + event signature (topic0).
+      // Client-side filtering by wallet address is applied afterward.
+      // This avoids issues with RPCs that don't support indexed topic filtering.
       const results = await Promise.allSettled([
         // Vault Deposits
         publicClient.getContractEvents({
           address: CHARIOT_ADDRESSES.CHARIOT_VAULT,
           abi: ChariotVaultABI,
           eventName: "Deposit",
-          args: { owner: address },
           fromBlock,
         }),
         // Vault Withdrawals
@@ -53,7 +68,6 @@ export function useTransactionHistory() {
           address: CHARIOT_ADDRESSES.CHARIOT_VAULT,
           abi: ChariotVaultABI,
           eventName: "Withdraw",
-          args: { receiver: address },
           fromBlock,
         }),
         // Borrows
@@ -61,7 +75,6 @@ export function useTransactionHistory() {
           address: CHARIOT_ADDRESSES.LENDING_POOL,
           abi: LendingPoolABI,
           eventName: "Borrowed",
-          args: { borrower: address },
           fromBlock,
         }),
         // Repayments
@@ -69,7 +82,6 @@ export function useTransactionHistory() {
           address: CHARIOT_ADDRESSES.LENDING_POOL,
           abi: LendingPoolABI,
           eventName: "Repaid",
-          args: { borrower: address },
           fromBlock,
         }),
         // Collateral Deposits
@@ -77,7 +89,6 @@ export function useTransactionHistory() {
           address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
           abi: CollateralManagerABI,
           eventName: "CollateralDeposited",
-          args: { user: address },
           fromBlock,
         }),
         // Collateral Withdrawals
@@ -85,26 +96,72 @@ export function useTransactionHistory() {
           address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
           abi: CollateralManagerABI,
           eventName: "CollateralWithdrawn",
-          args: { user: address },
           fromBlock,
         }),
       ]);
 
+      // Detect when every single query failed -- surface as error
+      const rejectedCount = results.filter(
+        (r) => r.status === "rejected"
+      ).length;
+      if (rejectedCount === results.length) {
+        const reasons = results.map((r) =>
+          r.status === "rejected" ? r.reason : null
+        );
+        console.error(
+          "[useTransactionHistory] All event queries failed:",
+          reasons
+        );
+        setIsError(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Log individual failures for debugging without blocking
+      for (let i = 0; i < results.length; i++) {
+        if (results[i].status === "rejected") {
+          console.warn(
+            `[useTransactionHistory] Event query ${i} failed:`,
+            (results[i] as PromiseRejectedResult).reason
+          );
+        }
+      }
+
       const extractLogs = <T,>(result: PromiseSettledResult<T[]>): T[] =>
         result.status === "fulfilled" ? result.value : [];
 
-      const depositLogs = extractLogs(results[0]);
-      const withdrawLogs = extractLogs(results[1]);
-      const borrowLogs = extractLogs(results[2]);
-      const repayLogs = extractLogs(results[3]);
-      const collateralDepositLogs = extractLogs(results[4]);
-      const collateralWithdrawLogs = extractLogs(results[5]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      type AnyLog = any;
+
+      // Extract logs and filter client-side by wallet address
+      const depositLogs = (extractLogs(results[0]) as AnyLog[]).filter(
+        (log) => addressMatch(log.args?.owner, address)
+      );
+      const withdrawLogs = (extractLogs(results[1]) as AnyLog[]).filter(
+        (log) => addressMatch(log.args?.receiver, address)
+      );
+      const borrowLogs = (extractLogs(results[2]) as AnyLog[]).filter(
+        (log) => addressMatch(log.args?.borrower, address)
+      );
+      const repayLogs = (extractLogs(results[3]) as AnyLog[]).filter(
+        (log) => addressMatch(log.args?.borrower, address)
+      );
+      const collateralDepositLogs = (
+        extractLogs(results[4]) as AnyLog[]
+      ).filter((log) => addressMatch(log.args?.user, address));
+      const collateralWithdrawLogs = (
+        extractLogs(results[5]) as AnyLog[]
+      ).filter((log) => addressMatch(log.args?.user, address));
 
       // Collect all unique block numbers to batch-fetch timestamps
       const blockNumbers = new Set<bigint>();
       const allLogs = [
-        ...depositLogs, ...withdrawLogs, ...borrowLogs,
-        ...repayLogs, ...collateralDepositLogs, ...collateralWithdrawLogs,
+        ...depositLogs,
+        ...withdrawLogs,
+        ...borrowLogs,
+        ...repayLogs,
+        ...collateralDepositLogs,
+        ...collateralWithdrawLogs,
       ] as Array<{ blockNumber: bigint | null }>;
 
       for (const log of allLogs) {
@@ -122,7 +179,10 @@ export function useTransactionHistory() {
         for (let i = 0; i < blockEntries.length; i++) {
           const result = blockResults[i];
           if (result.status === "fulfilled") {
-            blockTimestamps.set(blockEntries[i], Number(result.value.timestamp) * 1000);
+            blockTimestamps.set(
+              blockEntries[i],
+              Number(result.value.timestamp) * 1000
+            );
           }
         }
       }
@@ -134,11 +194,8 @@ export function useTransactionHistory() {
 
       const transactions: Transaction[] = [];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      type AnyLog = any;
-
       // Map deposit events
-      for (const log of depositLogs as AnyLog[]) {
+      for (const log of depositLogs) {
         transactions.push({
           id: `${log.transactionHash}-deposit`,
           type: "deposit",
@@ -152,7 +209,7 @@ export function useTransactionHistory() {
       }
 
       // Map withdrawal events
-      for (const log of withdrawLogs as AnyLog[]) {
+      for (const log of withdrawLogs) {
         transactions.push({
           id: `${log.transactionHash}-withdraw`,
           type: "withdrawal",
@@ -166,7 +223,7 @@ export function useTransactionHistory() {
       }
 
       // Map borrow events
-      for (const log of borrowLogs as AnyLog[]) {
+      for (const log of borrowLogs) {
         transactions.push({
           id: `${log.transactionHash}-borrow`,
           type: "borrow",
@@ -180,7 +237,7 @@ export function useTransactionHistory() {
       }
 
       // Map repay events
-      for (const log of repayLogs as AnyLog[]) {
+      for (const log of repayLogs) {
         transactions.push({
           id: `${log.transactionHash}-repay`,
           type: "repay",
@@ -194,7 +251,7 @@ export function useTransactionHistory() {
       }
 
       // Map collateral deposit events
-      for (const log of collateralDepositLogs as AnyLog[]) {
+      for (const log of collateralDepositLogs) {
         transactions.push({
           id: `${log.transactionHash}-collateral_deposit`,
           type: "collateral_deposit",
@@ -208,7 +265,7 @@ export function useTransactionHistory() {
       }
 
       // Map collateral withdrawal events
-      for (const log of collateralWithdrawLogs as AnyLog[]) {
+      for (const log of collateralWithdrawLogs) {
         transactions.push({
           id: `${log.transactionHash}-collateral_withdrawal`,
           type: "collateral_withdrawal",
