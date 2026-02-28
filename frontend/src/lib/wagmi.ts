@@ -9,6 +9,18 @@ import {
   trustWallet,
   braveWallet,
   injectedWallet,
+  phantomWallet,
+  okxWallet,
+  ledgerWallet,
+  zerionWallet,
+  safeWallet,
+  uniswapWallet,
+  bitgetWallet,
+  bybitWallet,
+  krakenWallet,
+  binanceWallet,
+  frameWallet,
+  argentWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 import { arcTestnet, ethereumSepolia } from "./chains";
 
@@ -23,6 +35,26 @@ const connectors = connectorsForWallets(
         coinbaseWallet,
         walletConnectWallet,
         rabbyWallet,
+        phantomWallet,
+        okxWallet,
+      ],
+    },
+    {
+      groupName: "Hardware & Smart Wallets",
+      wallets: [
+        ledgerWallet,
+        safeWallet,
+        frameWallet,
+      ],
+    },
+    {
+      groupName: "Exchange Wallets",
+      wallets: [
+        binanceWallet,
+        bybitWallet,
+        krakenWallet,
+        bitgetWallet,
+        uniswapWallet,
       ],
     },
     {
@@ -30,6 +62,8 @@ const connectors = connectorsForWallets(
       wallets: [
         rainbowWallet,
         trustWallet,
+        zerionWallet,
+        argentWallet,
         braveWallet,
         injectedWallet,
       ],
