@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IStork} from "../interfaces/IStork.sol";
+import {ICircuitBreaker} from "../interfaces/ICircuitBreaker.sol";
 import {StorkStructs} from "@stork-oracle/StorkStructs.sol";
 
 /// @title ChariotBase -- Abstract base for all Chariot protocol contracts
@@ -46,13 +47,13 @@ abstract contract ChariotBase is AccessControl, ReentrancyGuard {
 
     /// @dev Reverts if the circuit breaker is at Level 3 (Emergency).
     modifier whenNotPaused() {
-        if (circuitBreakerLevel >= 3) revert CircuitBreakerActive();
+        if (_getEffectiveCircuitBreakerLevel() >= 3) revert CircuitBreakerActive();
         _;
     }
 
     /// @dev Reverts if the circuit breaker is at Level 1+ (borrowing paused).
     modifier whenBorrowingAllowed() {
-        if (circuitBreakerLevel >= 1) revert BorrowingPaused();
+        if (_getEffectiveCircuitBreakerLevel() >= 1) revert BorrowingPaused();
         _;
     }
 
@@ -84,6 +85,27 @@ abstract contract ChariotBase is AccessControl, ReentrancyGuard {
     function resumeCircuitBreaker() external onlyRole(DEFAULT_ADMIN_ROLE) {
         circuitBreakerLevel = 0;
         emit CircuitBreakerResumed(msg.sender);
+    }
+
+    // -- Circuit Breaker Helpers --
+
+    /// @dev Get the effective circuit breaker level -- returns the higher of external CB and local state.
+    ///      If external CB contract is set and reachable, uses max(external, local).
+    ///      Falls back to local state on external call failure (prevents protocol bricking).
+    function _getEffectiveCircuitBreakerLevel() internal view returns (uint8) {
+        uint8 localLevel = circuitBreakerLevel;
+
+        if (circuitBreaker != address(0)) {
+            try ICircuitBreaker(circuitBreaker).level() returns (ICircuitBreaker.CircuitBreakerLevel externalLevel) {
+                uint8 extLevel = uint8(externalLevel);
+                return extLevel > localLevel ? extLevel : localLevel;
+            } catch {
+                // External CB unreachable -- fall back to local state
+                return localLevel;
+            }
+        }
+
+        return localLevel;
     }
 
     // -- Oracle Helpers --
