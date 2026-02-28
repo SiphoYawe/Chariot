@@ -1,0 +1,63 @@
+# Chariot Protocol -- Render Deployment Blueprint
+# Repo: https://github.com/SiphoYawe/Chariot.git
+
+services:
+  # --- Relayer: ETH Bridge (watches Sepolia deposits, mints BridgedETH on Arc) ---
+  - type: worker
+    name: chariot-relayer
+    runtime: node
+    region: oregon
+    plan: starter
+    numInstances: 1
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @chariot/shared build && pnpm --filter @chariot/relayer build
+    startCommand: node relayer/dist/index.js
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: ARC_RPC_URL
+        value: https://testnet-rpc.arc.ag
+      - key: ETH_ESCROW_ADDRESS
+        value: "0x42cAA0a88A42b92e1307E625e5253BE0dFABcCc2"
+      - key: BRIDGED_ETH_ADDRESS
+        value: "0x42cAA0a88A42b92e1307E625e5253BE0dFABcCc2"
+      - key: STATE_FILE_PATH
+        value: ./relayer-state.json
+      # --- YOU MUST SET THESE IN RENDER DASHBOARD ---
+      - key: RELAYER_PRIVATE_KEY
+        sync: false
+      - key: ETH_SEPOLIA_RPC_URL
+        sync: false
+
+  # --- Agent: Vault Management (monitors vaults, rebalances via Circle SDK) ---
+  - type: worker
+    name: chariot-agent
+    runtime: node
+    region: oregon
+    plan: starter
+    numInstances: 1
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @chariot/shared build && pnpm --filter @chariot/agent build
+    startCommand: node agent/dist/index.js
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: ARC_RPC_URL
+        value: https://testnet-rpc.arc.ag
+      - key: MONITOR_INTERVAL_MS
+        value: "60000"
+      - key: MAX_REBALANCES_PER_DAY
+        value: "3"
+      - key: MINIMUM_UTILITY_THRESHOLD
+        value: "0.001"
+      # --- YOU MUST SET THESE IN RENDER DASHBOARD ---
+      - key: CIRCLE_API_KEY
+        sync: false
+      - key: CIRCLE_ENTITY_SECRET
+        sync: false
+      - key: CIRCLE_WALLET_SET_ID
+        sync: false
+      - key: CIRCLE_WALLET_ID
+        sync: false
