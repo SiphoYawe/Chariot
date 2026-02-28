@@ -10,6 +10,9 @@ import { DashboardLenderPosition } from "@/components/collateral/DashboardLender
 import { VaultCompositionChart } from "@/components/charts/VaultCompositionChart";
 import { UtilisationHistoryChart } from "@/components/charts/UtilisationHistoryChart";
 import { UtilisationCurveChart } from "@/components/charts/UtilisationCurveChart";
+import { ProtocolKPIGrid } from "@/components/analytics/ProtocolKPIGrid";
+import { LiquidatorMonitoringTable } from "@/components/analytics/LiquidatorMonitoringTable";
+import { TopBorrowersList } from "@/components/analytics/TopBorrowersList";
 
 export default function DashboardPage() {
   return (
@@ -22,6 +25,14 @@ export default function DashboardPage() {
       {/* Lender Position -- compact summary with link to Lend page */}
       <section className="mb-8">
         <DashboardLenderPosition />
+      </section>
+
+      {/* Protocol KPI Cards -- TVL, Borrowed, Positions, Revenue with spark trends */}
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-[#023436] mb-4">
+          Protocol KPIs
+        </h2>
+        <ProtocolKPIGrid />
       </section>
 
       {/* Protocol Metrics */}
@@ -68,6 +79,19 @@ export default function DashboardPage() {
           Protocol Health
         </h2>
         <ProtocolHealthGrid />
+      </section>
+
+      {/* Borrower Positions & Top Positions */}
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-[#023436] mb-4">
+          Positions & Monitoring
+        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <LiquidatorMonitoringTable />
+          </div>
+          <TopBorrowersList />
+        </div>
       </section>
     </div>
   );
