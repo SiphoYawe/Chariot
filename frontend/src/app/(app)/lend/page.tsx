@@ -573,7 +573,7 @@ export default function LendPage() {
       ) : (
         <>
           {/* Top 2-column layout: Position + Action Panel */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,400px)] gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,400px)] gap-8 items-start">
             {/* Left column -- Position info */}
             <div className="space-y-6">
               {/* Earnings & Share Price side-by-side */}
@@ -587,7 +587,7 @@ export default function LendPage() {
             </div>
 
             {/* Right column -- Action Panel */}
-            <div className="self-start">
+            <div>
               <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6 sticky top-6">
                 <Tabs defaultValue="deposit">
                   <TabsList
