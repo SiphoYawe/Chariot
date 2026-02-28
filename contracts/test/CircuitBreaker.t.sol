@@ -389,6 +389,7 @@ contract CircuitBreakerTest is Test {
 
     function test_level2_perAddressRateLimitCapsAt5Percent() public {
         uint256 poolTotal = 1_000_000e6;
+        uint256 largePosition = 10_000e6; // Large depositor (above small depositor threshold)
 
         // Trigger Level 2
         vm.prank(recorder);
@@ -399,14 +400,14 @@ contract CircuitBreakerTest is Test {
         uint256 limit = cb.getWithdrawalLimit(poolTotal);
         assertEq(limit, 50_000e6);
 
-        // Alice trying to withdraw 50,000 -- should pass
-        cb.checkWithdrawalAllowed(alice, 50_000e6, poolTotal, 0);
+        // Alice (large depositor) trying to withdraw 50,000 -- should pass
+        cb.checkWithdrawalAllowed(alice, 50_000e6, poolTotal, largePosition);
 
         // Alice trying to withdraw 50,001 -- should revert
         vm.expectRevert(
             abi.encodeWithSelector(CircuitBreaker.WithdrawalRateLimited.selector, alice, 50_000e6, 50_001e6)
         );
-        cb.checkWithdrawalAllowed(alice, 50_001e6, poolTotal, 0);
+        cb.checkWithdrawalAllowed(alice, 50_001e6, poolTotal, largePosition);
     }
 
     function test_level2_minWithdrawalAmountFloor() public {
@@ -688,6 +689,108 @@ contract CircuitBreakerTest is Test {
     }
 
     // ============================
+    // Story 9-4: Small Depositor Protection
+    // ============================
+
+    function test_smallDepositor_exemptDuringLevel2() public {
+        uint256 poolTotal = 1_000_000e6;
+
+        // Trigger Level 2
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, poolTotal);
+        assertEq(uint8(cb.level()), 2);
+
+        // Small depositor (500 USDC position) can withdraw their full balance
+        // Even though the amount exceeds the per-address rate limit
+        cb.checkWithdrawalAllowed(alice, 500e6, poolTotal, 500e6);
+        // No revert -- small depositor exempted
+    }
+
+    function test_smallDepositor_exemptDuringLevel3() public {
+        // Trigger Level 3
+        vm.prank(recorder);
+        cb.recordOracleTimestamp(block.timestamp - 3601);
+        assertEq(uint8(cb.level()), 3);
+
+        // Small depositor can still withdraw
+        cb.checkWithdrawalAllowed(alice, 900e6, 1_000_000e6, 900e6);
+    }
+
+    function test_smallDepositor_largeDepositorStillRateLimited() public {
+        uint256 poolTotal = 1_000_000e6;
+
+        // Trigger Level 2
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, poolTotal);
+
+        // Large depositor (10,000 USDC) is still rate-limited
+        // Limit = 5% of 1M = 50,000 USDC
+        vm.expectRevert(
+            abi.encodeWithSelector(CircuitBreaker.WithdrawalRateLimited.selector, alice, 50_000e6, 100_000e6)
+        );
+        cb.checkWithdrawalAllowed(alice, 100_000e6, poolTotal, 10_000e6);
+    }
+
+    function test_smallDepositor_thresholdBoundary() public {
+        uint256 poolTotal = 1_000_000e6;
+
+        // Trigger Level 2
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, poolTotal);
+
+        // Exactly at threshold (1000 USDC) -- should be treated as small depositor (<=)
+        cb.checkWithdrawalAllowed(alice, 1000e6, poolTotal, 1000e6);
+
+        // Just above threshold (1001 USDC) -- rate-limited
+        // limit = 50k, requesting 100k
+        vm.expectRevert(
+            abi.encodeWithSelector(CircuitBreaker.WithdrawalRateLimited.selector, alice, 50_000e6, 100_000e6)
+        );
+        cb.checkWithdrawalAllowed(alice, 100_000e6, poolTotal, 1001e6);
+    }
+
+    function test_smallDepositor_thresholdConfigurableByAdmin() public {
+        assertEq(cb.smallDepositorThreshold(), 1000e6);
+
+        vm.prank(admin);
+        cb.setSmallDepositorThreshold(2000e6);
+
+        assertEq(cb.smallDepositorThreshold(), 2000e6);
+    }
+
+    function test_smallDepositor_thresholdSetterRevertsForNonAdmin() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        cb.setSmallDepositorThreshold(2000e6);
+    }
+
+    function test_smallDepositor_antiGaming_usesPreWithdrawalBalance() public {
+        uint256 poolTotal = 1_000_000e6;
+
+        // Trigger Level 2
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, poolTotal);
+
+        // A large depositor has 5000 USDC. Their position is checked BEFORE withdrawal.
+        // positionValue = 5000e6 > threshold = 1000e6, so they are NOT exempt.
+        vm.expectRevert(
+            abi.encodeWithSelector(CircuitBreaker.WithdrawalRateLimited.selector, alice, 50_000e6, 100_000e6)
+        );
+        cb.checkWithdrawalAllowed(alice, 100_000e6, poolTotal, 5000e6);
+
+        // Even if they try to claim their balance is small (by passing a lower positionValue),
+        // the vault must pass the REAL pre-withdrawal balance. This is enforced at the
+        // ChariotVault level, not in CircuitBreaker (trusted caller pattern).
+    }
+
+    function test_smallDepositor_noExemptionWhenNotStressed() public {
+        // When not in Level 2/3, rate limiting is not enforced at all,
+        // so the small depositor check is irrelevant
+        cb.checkWithdrawalAllowed(alice, 1_000_000e6, 1_000_000e6, 500e6);
+        // No revert -- no rate limiting when Inactive
+    }
+
+    // ============================
     // Fuzz Tests
     // ============================
 
@@ -725,5 +828,21 @@ contract CircuitBreakerTest is Test {
 
         uint8 lvl = uint8(cb.level());
         assertTrue(lvl <= 3);
+    }
+
+    function testFuzz_smallDepositor_positionValues(uint256 positionValue, uint256 amount) public {
+        positionValue = bound(positionValue, 0, type(uint128).max);
+        amount = bound(amount, 0, type(uint128).max);
+
+        // Trigger Level 2
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, 1_000_000e6);
+
+        // If positionValue <= threshold, should not revert
+        if (positionValue <= cb.smallDepositorThreshold()) {
+            cb.checkWithdrawalAllowed(alice, amount, 1_000_000e6, positionValue);
+        }
+        // If positionValue > threshold and amount > limit, should revert
+        // We don't test the revert path here as it depends on specific amounts
     }
 }

@@ -50,6 +50,9 @@ contract CircuitBreaker is AccessControl, ICircuitBreaker {
     uint256 public highUtilisationStart; // Timestamp when utilisation first exceeded 95%
     uint256 public lastRecordedUtilisation; // Latest utilisation rate (WAD)
 
+    // -- Small Depositor Protection --
+    uint256 public smallDepositorThreshold = 1000e6; // 1,000 USDC (6 decimals) -- configurable by admin
+
     // -- Custom Errors --
     error ZeroAddress();
     error InvalidLevel();
@@ -91,7 +94,12 @@ contract CircuitBreaker is AccessControl, ICircuitBreaker {
         // Only enforce rate limiting during Stress or Emergency
         if (currentLevel < CircuitBreakerLevel.Stress) return;
 
-        // Small depositor exemption handled in Story 9-4 (positionValue param reserved)
+        // Small depositor exemption: if user's position value (BEFORE this withdrawal)
+        // is below the threshold, allow full withdrawal without rate limiting.
+        // positionValue should be the user's balance BEFORE the current withdrawal to prevent gaming.
+        if (positionValue <= smallDepositorThreshold) {
+            return;
+        }
 
         uint256 hourBucket = block.timestamp / 1 hours;
         uint256 alreadyWithdrawn = addressHourlyWithdrawals[user][hourBucket];
@@ -181,6 +189,12 @@ contract CircuitBreaker is AccessControl, ICircuitBreaker {
         currentLevel = lvl;
         levelActivatedAt = block.timestamp;
         emit CircuitBreakerTriggered(newLevel, block.timestamp, 0);
+    }
+
+    /// @notice Set the small depositor threshold (DEFAULT_ADMIN_ROLE only)
+    /// @param threshold New threshold in USDC (6 decimals). Users with position <= threshold bypass rate limits.
+    function setSmallDepositorThreshold(uint256 threshold) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        smallDepositorThreshold = threshold;
     }
 
     /// @notice Admin resume from Emergency -- resets circuit breaker to Inactive (DEFAULT_ADMIN_ROLE only)
