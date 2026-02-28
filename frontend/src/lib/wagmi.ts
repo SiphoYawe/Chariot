@@ -1,10 +1,48 @@
-import { http } from "wagmi";
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import { http, createConfig } from "wagmi";
+import { connectorsForWallets } from "@rainbow-me/rainbowkit";
+import {
+  metaMaskWallet,
+  coinbaseWallet,
+  walletConnectWallet,
+  rainbowWallet,
+  rabbyWallet,
+  trustWallet,
+  braveWallet,
+  injectedWallet,
+} from "@rainbow-me/rainbowkit/wallets";
 import { arcTestnet, ethereumSepolia } from "./chains";
 
-export const config = getDefaultConfig({
-  appName: "Chariot",
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo",
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo";
+
+const connectors = connectorsForWallets(
+  [
+    {
+      groupName: "Popular",
+      wallets: [
+        metaMaskWallet,
+        coinbaseWallet,
+        walletConnectWallet,
+        rabbyWallet,
+      ],
+    },
+    {
+      groupName: "More",
+      wallets: [
+        rainbowWallet,
+        trustWallet,
+        braveWallet,
+        injectedWallet,
+      ],
+    },
+  ],
+  {
+    appName: "Chariot",
+    projectId,
+  }
+);
+
+export const config = createConfig({
+  connectors,
   chains: [arcTestnet, ethereumSepolia],
   transports: {
     [arcTestnet.id]: http(arcTestnet.rpcUrls.default.http[0]),

@@ -32,7 +32,7 @@ export function WalletButton() {
                 return (
                   <button
                     onClick={openConnectModal}
-                    className="px-4 py-2 text-sm font-medium bg-[#03B5AA] text-white hover:bg-[#037971] transition-colors"
+                    className="px-5 py-2.5 text-sm font-medium bg-[#03B5AA] text-white hover:bg-[#037971] transition-colors"
                   >
                     Connect Wallet
                   </button>
@@ -43,7 +43,7 @@ export function WalletButton() {
                 return (
                   <button
                     onClick={openChainModal}
-                    className="px-4 py-2 text-sm font-medium bg-[#DC2626] text-white hover:bg-[#B91C1C] transition-colors"
+                    className="px-5 py-2.5 text-sm font-medium bg-[#DC2626] text-white hover:bg-[#B91C1C] transition-colors"
                   >
                     Wrong Network
                   </button>
@@ -61,9 +61,15 @@ export function WalletButton() {
                   </button>
                   <button
                     onClick={openAccountModal}
-                    className="px-3 py-2 text-sm font-medium text-[#023436] border border-[rgba(3,121,113,0.15)] hover:bg-[#F8FAFA] transition-colors"
+                    className="flex items-center gap-2.5 px-4 py-2 text-sm font-medium text-[#023436] border border-[rgba(3,121,113,0.15)] hover:bg-[#F8FAFA] transition-colors min-w-[180px]"
                   >
-                    {account.displayName}
+                    <span className="w-2 h-2 bg-[#03B5AA]" />
+                    <span className="font-mono tabular-nums">{account.displayName}</span>
+                    {account.displayBalance && (
+                      <span className="text-xs text-[#6B8A8D] ml-auto tabular-nums">
+                        {account.displayBalance}
+                      </span>
+                    )}
                   </button>
                 </div>
               );
