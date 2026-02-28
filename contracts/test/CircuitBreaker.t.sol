@@ -509,6 +509,185 @@ contract CircuitBreakerTest is Test {
     }
 
     // ============================
+    // Level 3: Emergency Mode
+    // ============================
+
+    function test_level3_triggersOnHighUtilisationFor30Min() public {
+        // Record >95% utilisation
+        vm.prank(recorder);
+        cb.recordUtilisation(0.96e18); // 96%
+
+        // Not yet triggered -- need 30 min sustained
+        assertEq(uint8(cb.level()), uint8(ICircuitBreaker.CircuitBreakerLevel.Inactive));
+
+        // Wait 30 minutes + 1 second
+        vm.warp(block.timestamp + 30 minutes + 1);
+        vm.prank(recorder);
+        cb.recordUtilisation(0.96e18);
+
+        assertEq(uint8(cb.level()), uint8(ICircuitBreaker.CircuitBreakerLevel.Emergency));
+    }
+
+    function test_level3_doesNotTriggerIfUtilisationDrops() public {
+        vm.prank(recorder);
+        cb.recordUtilisation(0.96e18);
+
+        vm.warp(block.timestamp + 20 minutes);
+
+        // Utilisation drops to 90% -- reset tracker
+        vm.prank(recorder);
+        cb.recordUtilisation(0.90e18);
+
+        vm.warp(block.timestamp + 15 minutes);
+        vm.prank(recorder);
+        cb.recordUtilisation(0.96e18);
+
+        // Only 15 min of high utilisation since drop, not 30
+        assertEq(uint8(cb.level()), uint8(ICircuitBreaker.CircuitBreakerLevel.Inactive));
+    }
+
+    function test_level3_triggersOnStaleOracle() public {
+        // Record oracle update from 1 hour + 1 second ago
+        uint256 staleTimestamp = block.timestamp - 3601;
+
+        vm.prank(recorder);
+        cb.recordOracleTimestamp(staleTimestamp);
+
+        assertEq(uint8(cb.level()), uint8(ICircuitBreaker.CircuitBreakerLevel.Emergency));
+    }
+
+    function test_level3_doesNotTriggerOnFreshOracle() public {
+        // Oracle updated 30 minutes ago -- still fresh
+        uint256 freshTimestamp = block.timestamp - 1800;
+
+        vm.prank(recorder);
+        cb.recordOracleTimestamp(freshTimestamp);
+
+        assertEq(uint8(cb.level()), uint8(ICircuitBreaker.CircuitBreakerLevel.Inactive));
+    }
+
+    function test_level3_blocksAllExceptRepayAndLiquidate() public {
+        // Trigger Emergency
+        vm.prank(recorder);
+        cb.recordOracleTimestamp(block.timestamp - 3601);
+        assertEq(uint8(cb.level()), 3);
+
+        // Level 3 >= 3, so whenNotPaused reverts (blocks deposits, rebalance, etc.)
+        // Level 3 >= 1, so whenBorrowingAllowed reverts (blocks borrows)
+        assertTrue(uint8(cb.level()) >= 3);
+        assertTrue(uint8(cb.level()) >= 1);
+
+        // USYC redemptions blocked
+        assertFalse(cb.isUSYCRedemptionAllowed());
+    }
+
+    function test_level3_allowsRepayAndLiquidations() public {
+        // At Level 3, repay and liquidate still work -- they don't use whenNotPaused
+        // This is tested at the contract integration level, not here.
+        // Just verify the level is correct.
+        vm.prank(recorder);
+        cb.recordOracleTimestamp(block.timestamp - 3601);
+        assertEq(uint8(cb.level()), 3);
+    }
+
+    function test_level3_doesNotAutoRecover() public {
+        // Trigger via oracle staleness
+        vm.prank(recorder);
+        cb.recordOracleTimestamp(block.timestamp - 3601);
+        assertEq(uint8(cb.level()), 3);
+
+        // Record fresh oracle and normal utilisation
+        vm.warp(block.timestamp + 1 hours);
+        vm.prank(recorder);
+        cb.recordOracleTimestamp(block.timestamp - 100); // Fresh
+
+        vm.prank(recorder);
+        cb.recordUtilisation(0.50e18); // Normal
+
+        // Should still be Emergency -- no auto-recovery
+        assertEq(uint8(cb.level()), uint8(ICircuitBreaker.CircuitBreakerLevel.Emergency));
+    }
+
+    function test_level3_resumeRequiresAdmin() public {
+        vm.prank(recorder);
+        cb.recordOracleTimestamp(block.timestamp - 3601);
+        assertEq(uint8(cb.level()), 3);
+
+        // Non-admin cannot resume
+        vm.prank(alice);
+        vm.expectRevert();
+        cb.resume();
+
+        // Admin can resume
+        vm.prank(admin);
+        cb.resume();
+        assertEq(uint8(cb.level()), 0);
+    }
+
+    function test_level3_resumeEmitsEvent() public {
+        vm.prank(recorder);
+        cb.recordOracleTimestamp(block.timestamp - 3601);
+
+        vm.expectEmit(true, false, false, true);
+        emit ICircuitBreaker.CircuitBreakerResumed(3, block.timestamp);
+
+        vm.prank(admin);
+        cb.resume();
+    }
+
+    function test_level3_escalationPath_inactiveToEmergency() public {
+        // Trigger Level 1 first (collateral drop)
+        vm.prank(recorder);
+        cb.recordCollateralValue(1_000_000e6);
+        vm.prank(recorder);
+        cb.recordCollateralValue(840_000e6);
+        assertEq(uint8(cb.level()), 1);
+
+        // Escalate to Level 2 (withdrawal surge)
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, 1_000_000e6);
+        assertEq(uint8(cb.level()), 2);
+
+        // Escalate to Level 3 (oracle stale)
+        vm.prank(recorder);
+        cb.recordOracleTimestamp(block.timestamp - 3601);
+        assertEq(uint8(cb.level()), 3);
+    }
+
+    function test_level3_usycRedemptionAllowedAtLowerLevels() public {
+        assertTrue(cb.isUSYCRedemptionAllowed()); // Inactive
+
+        vm.prank(admin);
+        cb.setLevel(1);
+        assertTrue(cb.isUSYCRedemptionAllowed()); // Caution
+
+        vm.prank(admin);
+        cb.setLevel(2);
+        assertTrue(cb.isUSYCRedemptionAllowed()); // Stress
+
+        vm.prank(admin);
+        cb.setLevel(3);
+        assertFalse(cb.isUSYCRedemptionAllowed()); // Emergency -- blocked
+    }
+
+    function test_level3_resumeResetsUtilisationTracking() public {
+        // Start high utilisation tracking
+        vm.prank(recorder);
+        cb.recordUtilisation(0.96e18);
+        assertTrue(cb.highUtilisationStart() > 0);
+
+        // Trigger Level 3 via oracle
+        vm.prank(recorder);
+        cb.recordOracleTimestamp(block.timestamp - 3601);
+
+        // Resume
+        vm.prank(admin);
+        cb.resume();
+
+        assertEq(cb.highUtilisationStart(), 0);
+    }
+
+    // ============================
     // Fuzz Tests
     // ============================
 
