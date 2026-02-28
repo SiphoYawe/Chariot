@@ -55,12 +55,6 @@ export function BorrowRateDisplay() {
                 </span>
               )}
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[#9CA3AF]">Concentration Premium</span>
-              <span className="text-xs bg-[#F8FAFA] border border-[rgba(3,121,113,0.15)] px-2 py-0.5 text-[#9CA3AF]">
-                Phase 3
-              </span>
-            </div>
           </div>
         </>
       )}

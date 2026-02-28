@@ -86,12 +86,6 @@ export function BorrowRateDisplay({
               </span>
             )}
           </div>
-          <div className="flex justify-between items-center opacity-40">
-            <span className="text-xs text-[#6B8A8D]">Concentration premium</span>
-            <span className="text-xs text-[#6B8A8D] font-[family-name:var(--font-heading)] tabular-nums">
-              Phase 3
-            </span>
-          </div>
         </div>
       )}
     </div>
