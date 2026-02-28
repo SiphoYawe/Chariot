@@ -15,27 +15,22 @@ export function TrustBar() {
         <h2 className="text-center text-base font-semibold uppercase tracking-wider text-[#3D5C5F] mb-10">
           Built on trusted infrastructure.
         </h2>
-        <div className="flex items-center justify-center gap-10 mb-10">
+        <div className="flex items-center justify-center gap-12">
           {partners.map((partner) => (
             <div
               key={partner.name}
-              className="flex items-center justify-center px-6 py-4 border border-[rgba(3,121,113,0.15)] bg-white min-w-[140px] h-16"
+              className="flex items-center justify-center px-8 py-6 border border-[rgba(3,121,113,0.15)] bg-white min-w-[180px] h-24"
             >
               <Image
                 src={partner.logo}
                 alt={partner.name}
-                width={100}
+                width={140}
                 height={partner.height}
-                className="object-contain max-h-8"
+                className="object-contain max-h-14"
               />
             </div>
           ))}
         </div>
-        <p className="text-center text-base text-[#3D5C5F] max-w-[680px] mx-auto leading-relaxed">
-          Chariot settles all transactions on Arc with sub-second deterministic
-          finality. USDC moves across chains via Circle CCTP. Idle capital earns
-          T-bill yield through USYC.
-        </p>
       </div>
     </section>
   );

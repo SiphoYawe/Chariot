@@ -4,8 +4,8 @@ export function HeroSection() {
   return (
     <section className="pt-36 pb-20">
       <div className="max-w-[1200px] mx-auto px-8">
-        <div className="max-w-[800px] mx-auto text-center">
-          <h1 className="text-[4rem] font-bold leading-[1.1] tracking-tight text-[#023436] mb-8">
+        <div className="max-w-[960px] mx-auto text-center">
+          <h1 className="text-[3.75rem] font-bold leading-[1.1] tracking-tight text-[#023436] mb-8">
             Earn yield on every dollar.
             <br />
             Borrow against ETH without selling.
