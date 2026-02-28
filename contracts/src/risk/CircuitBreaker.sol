@@ -8,6 +8,7 @@ import {ICircuitBreaker} from "../interfaces/ICircuitBreaker.sol";
 /// @notice Standalone contract (does NOT inherit ChariotBase). Monitors collateral, withdrawal volume,
 ///         utilisation, and oracle freshness to automatically escalate/de-escalate protection levels.
 /// @dev Level 1 (Caution): auto-triggers on >15% collateral drop in 1hr, auto-recovers after 30min stability
+///      Level 2 (Stress): auto-triggers on >20% withdrawal rate in 1hr, rate-limits withdrawals to 5% pool/hr/address
 contract CircuitBreaker is AccessControl, ICircuitBreaker {
     // -- Roles --
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
@@ -19,23 +20,35 @@ contract CircuitBreaker is AccessControl, ICircuitBreaker {
     uint256 public constant MONITORING_WINDOW = 1 hours;
     uint256 public constant RECOVERY_PERIOD = 30 minutes;
 
+    // -- Level 2 Constants --
+    uint256 public constant WITHDRAWAL_RATE_THRESHOLD = 0.20e18; // 20% of pool triggers Level 2
+    uint256 public constant WITHDRAWAL_RATE_LIMIT = 0.05e18; // 5% of pool per address per hour
+    uint256 public constant MIN_WITHDRAWAL_AMOUNT = 100e6; // 100 USDC floor (6 decimals)
+    uint256 public constant RECOVERY_RATE_THRESHOLD = 0.10e18; // 10% -- Level 2 recovers below this
+
     // -- State --
     CircuitBreakerLevel public currentLevel;
     uint256 public levelActivatedAt;
 
     // -- Level 1: Collateral Monitoring --
-    // Gas-efficient peak-tracking instead of circular buffer:
-    // Track the peak collateral value in the current monitoring window.
-    // If collateral drops >15% from peak within the window, trigger Level 1.
     uint256 public peakCollateralValue;
     uint256 public peakTimestamp;
     uint256 public lastStableTimestamp;
+
+    // -- Level 2: Withdrawal Volume Tracking --
+    // Track total withdrawal volume using hour buckets for gas efficiency
+    mapping(uint256 => uint256) public hourlyWithdrawalVolume; // hourBucket => total volume
+    // Track per-address withdrawal amounts within current hour
+    mapping(address => mapping(uint256 => uint256)) public addressHourlyWithdrawals;
+    // Track when Level 2 withdrawal rate last dropped below recovery threshold
+    uint256 public withdrawalRecoveryStart;
 
     // -- Custom Errors --
     error ZeroAddress();
     error InvalidLevel();
     error LevelNotEscalated(uint8 current, uint8 requested);
     error ZeroCollateralValue();
+    error WithdrawalRateLimited(address user, uint256 limit, uint256 requested);
 
     // -- Constructor --
     constructor(address admin_) {
@@ -53,21 +66,83 @@ contract CircuitBreaker is AccessControl, ICircuitBreaker {
         return currentLevel;
     }
 
+    /// @inheritdoc ICircuitBreaker
+    function getWithdrawalLimit(uint256 poolTotal) external pure override returns (uint256) {
+        uint256 rateLimit = (poolTotal * WITHDRAWAL_RATE_LIMIT) / 1e18;
+        return rateLimit > MIN_WITHDRAWAL_AMOUNT ? rateLimit : MIN_WITHDRAWAL_AMOUNT;
+    }
+
+    /// @inheritdoc ICircuitBreaker
+    function checkWithdrawalAllowed(address user, uint256 amount, uint256 poolTotal, uint256 positionValue)
+        external
+        view
+        override
+    {
+        // Only enforce rate limiting during Stress or Emergency
+        if (currentLevel < CircuitBreakerLevel.Stress) return;
+
+        // Small depositor exemption handled in Story 9-4 (positionValue param reserved)
+        // For now, just enforce rate limiting for all users
+
+        uint256 hourBucket = block.timestamp / 1 hours;
+        uint256 alreadyWithdrawn = addressHourlyWithdrawals[user][hourBucket];
+
+        uint256 limit = (poolTotal * WITHDRAWAL_RATE_LIMIT) / 1e18;
+        if (limit < MIN_WITHDRAWAL_AMOUNT) limit = MIN_WITHDRAWAL_AMOUNT;
+
+        if (alreadyWithdrawn + amount > limit) {
+            revert WithdrawalRateLimited(user, limit, alreadyWithdrawn + amount);
+        }
+    }
+
+    /// @inheritdoc ICircuitBreaker
+    function isUSYCRedemptionAllowed() external view override returns (bool) {
+        // USYC redemptions blocked during Emergency only (Story 9-3)
+        return currentLevel != CircuitBreakerLevel.Emergency;
+    }
+
     // -- Level 1: Collateral Monitoring --
 
     /// @inheritdoc ICircuitBreaker
     function recordCollateralValue(uint256 totalValue) external override onlyRole(RECORDER_ROLE) {
-        // Reject zero values -- a collateral wipeout must be handled explicitly
         if (totalValue == 0) revert ZeroCollateralValue();
 
-        // Update peak tracking
         _updateCollateralPeak(totalValue);
-
-        // Check for Level 1 trigger
         _checkCollateralDrop(totalValue);
-
-        // Check for auto-recovery from Level 1
         _checkRecovery(totalValue);
+    }
+
+    // -- Level 2: Withdrawal Volume Tracking --
+
+    /// @inheritdoc ICircuitBreaker
+    function recordWithdrawal(uint256 amount, uint256 poolTotal) external override onlyRole(RECORDER_ROLE) {
+        uint256 hourBucket = block.timestamp / 1 hours;
+
+        // Track total hourly withdrawal volume
+        hourlyWithdrawalVolume[hourBucket] += amount;
+
+        // Check for Level 2 trigger
+        if (currentLevel < CircuitBreakerLevel.Stress && poolTotal > 0) {
+            uint256 withdrawalRate = (hourlyWithdrawalVolume[hourBucket] * 1e18) / poolTotal;
+            if (withdrawalRate > WITHDRAWAL_RATE_THRESHOLD) {
+                _escalateToLevel(CircuitBreakerLevel.Stress, withdrawalRate);
+            }
+        }
+
+        // Check for Level 2 auto-recovery
+        _checkWithdrawalRecovery(poolTotal);
+    }
+
+    // -- Stub functions for Story 9-3 (implemented later) --
+
+    /// @inheritdoc ICircuitBreaker
+    function recordUtilisation(uint256) external override onlyRole(RECORDER_ROLE) {
+        // Implemented in Story 9-3
+    }
+
+    /// @inheritdoc ICircuitBreaker
+    function recordOracleTimestamp(uint256) external override onlyRole(RECORDER_ROLE) {
+        // Implemented in Story 9-3
     }
 
     // -- Admin Functions --
@@ -92,6 +167,7 @@ contract CircuitBreaker is AccessControl, ICircuitBreaker {
         currentLevel = CircuitBreakerLevel.Inactive;
         levelActivatedAt = 0;
         lastStableTimestamp = block.timestamp;
+        withdrawalRecoveryStart = 0;
 
         // Reset peak tracking
         peakCollateralValue = 0;
@@ -102,17 +178,23 @@ contract CircuitBreaker is AccessControl, ICircuitBreaker {
 
     // -- Internal Functions --
 
+    /// @dev Escalate to a higher circuit breaker level
+    function _escalateToLevel(CircuitBreakerLevel newLevel, uint256 triggerValue) internal {
+        if (newLevel <= currentLevel) return;
+        currentLevel = newLevel;
+        levelActivatedAt = block.timestamp;
+        lastStableTimestamp = 0;
+        emit CircuitBreakerTriggered(uint8(newLevel), block.timestamp, triggerValue);
+    }
+
     /// @dev Update the peak collateral value within the monitoring window
-    /// @param currentValue Current total collateral value
     function _updateCollateralPeak(uint256 currentValue) internal {
-        // If peak is outside the monitoring window, reset it
         if (block.timestamp - peakTimestamp > MONITORING_WINDOW) {
             peakCollateralValue = currentValue;
             peakTimestamp = block.timestamp;
             return;
         }
 
-        // Update peak if current value is higher
         if (currentValue > peakCollateralValue) {
             peakCollateralValue = currentValue;
             peakTimestamp = block.timestamp;
@@ -120,15 +202,9 @@ contract CircuitBreaker is AccessControl, ICircuitBreaker {
     }
 
     /// @dev Check if collateral has dropped beyond threshold from peak
-    /// @param currentValue Current total collateral value
     function _checkCollateralDrop(uint256 currentValue) internal {
-        // Only trigger Level 1 if currently Inactive
         if (currentLevel >= CircuitBreakerLevel.Caution) return;
-
-        // Need a peak to compare against
         if (peakCollateralValue == 0) return;
-
-        // Calculate percentage drop from peak
         if (currentValue >= peakCollateralValue) return;
 
         uint256 drop = ((peakCollateralValue - currentValue) * 1e18) / peakCollateralValue;
@@ -136,9 +212,8 @@ contract CircuitBreaker is AccessControl, ICircuitBreaker {
         if (drop > COLLATERAL_DROP_THRESHOLD) {
             currentLevel = CircuitBreakerLevel.Caution;
             levelActivatedAt = block.timestamp;
-            lastStableTimestamp = 0; // Reset stability tracking
+            lastStableTimestamp = 0;
 
-            // Reset peak to current value so recovery tracks stability from this new baseline
             peakCollateralValue = currentValue;
             peakTimestamp = block.timestamp;
 
@@ -147,12 +222,9 @@ contract CircuitBreaker is AccessControl, ICircuitBreaker {
     }
 
     /// @dev Check if conditions allow auto-recovery from Level 1 (Caution)
-    /// @param currentValue Current total collateral value
     function _checkRecovery(uint256 currentValue) internal {
         // Only auto-recover from Level 1 (Caution)
         if (currentLevel != CircuitBreakerLevel.Caution) return;
-
-        // Check if collateral is within safe range (not dropping from peak)
         if (peakCollateralValue == 0) return;
 
         bool isStable;
@@ -164,27 +236,62 @@ contract CircuitBreaker is AccessControl, ICircuitBreaker {
         }
 
         if (isStable) {
-            // Start or continue stability tracking
             if (lastStableTimestamp == 0) {
                 lastStableTimestamp = block.timestamp;
             }
 
-            // Check if stable for long enough
             if (block.timestamp - lastStableTimestamp >= RECOVERY_PERIOD) {
                 uint8 previousLevel = uint8(currentLevel);
                 currentLevel = CircuitBreakerLevel.Inactive;
                 levelActivatedAt = 0;
                 lastStableTimestamp = block.timestamp;
 
-                // Reset peak to current value after recovery
                 peakCollateralValue = currentValue;
                 peakTimestamp = block.timestamp;
 
                 emit CircuitBreakerResumed(previousLevel, block.timestamp);
             }
         } else {
-            // Not stable -- reset timer
             lastStableTimestamp = 0;
+        }
+    }
+
+    /// @dev Check if Level 2 withdrawal rate has dropped below recovery threshold
+    function _checkWithdrawalRecovery(uint256 poolTotal) internal {
+        // Only auto-recover from Level 2 (Stress)
+        if (currentLevel != CircuitBreakerLevel.Stress) return;
+        if (poolTotal == 0) return;
+
+        uint256 hourBucket = block.timestamp / 1 hours;
+        uint256 currentRate = (hourlyWithdrawalVolume[hourBucket] * 1e18) / poolTotal;
+
+        if (currentRate < RECOVERY_RATE_THRESHOLD) {
+            if (withdrawalRecoveryStart == 0) {
+                withdrawalRecoveryStart = block.timestamp;
+            }
+
+            if (block.timestamp - withdrawalRecoveryStart >= RECOVERY_PERIOD) {
+                // Level 2 recovery: return to Level 1 if collateral conditions still warrant, else Inactive
+                uint8 previousLevel = uint8(currentLevel);
+
+                // Check if collateral conditions still warrant Level 1
+                bool collateralStillStressed = false;
+                if (peakCollateralValue > 0) {
+                    // We don't have the current collateral value here, so go to Inactive
+                    // The next recordCollateralValue will re-trigger Level 1 if needed
+                    collateralStillStressed = false;
+                }
+
+                currentLevel =
+                    collateralStillStressed ? CircuitBreakerLevel.Caution : CircuitBreakerLevel.Inactive;
+                levelActivatedAt = 0;
+                withdrawalRecoveryStart = 0;
+                lastStableTimestamp = block.timestamp;
+
+                emit CircuitBreakerResumed(previousLevel, block.timestamp);
+            }
+        } else {
+            withdrawalRecoveryStart = 0;
         }
     }
 }

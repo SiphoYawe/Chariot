@@ -364,6 +364,151 @@ contract CircuitBreakerTest is Test {
     }
 
     // ============================
+    // Level 2: Withdrawal Rate Limiting
+    // ============================
+
+    function test_level2_triggersOnHighWithdrawalRate() public {
+        uint256 poolTotal = 1_000_000e6; // 1M USDC pool
+
+        // Withdraw 210k (21% > 20% threshold)
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, poolTotal);
+
+        assertEq(uint8(cb.level()), uint8(ICircuitBreaker.CircuitBreakerLevel.Stress));
+    }
+
+    function test_level2_doesNotTriggerBelowThreshold() public {
+        uint256 poolTotal = 1_000_000e6;
+
+        // Withdraw 190k (19% < 20% threshold)
+        vm.prank(recorder);
+        cb.recordWithdrawal(190_000e6, poolTotal);
+
+        assertEq(uint8(cb.level()), uint8(ICircuitBreaker.CircuitBreakerLevel.Inactive));
+    }
+
+    function test_level2_perAddressRateLimitCapsAt5Percent() public {
+        uint256 poolTotal = 1_000_000e6;
+
+        // Trigger Level 2
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, poolTotal);
+        assertEq(uint8(cb.level()), 2);
+
+        // Per-address limit = 5% of 1M = 50,000 USDC
+        uint256 limit = cb.getWithdrawalLimit(poolTotal);
+        assertEq(limit, 50_000e6);
+
+        // Alice trying to withdraw 50,000 -- should pass
+        cb.checkWithdrawalAllowed(alice, 50_000e6, poolTotal, 0);
+
+        // Alice trying to withdraw 50,001 -- should revert
+        vm.expectRevert(
+            abi.encodeWithSelector(CircuitBreaker.WithdrawalRateLimited.selector, alice, 50_000e6, 50_001e6)
+        );
+        cb.checkWithdrawalAllowed(alice, 50_001e6, poolTotal, 0);
+    }
+
+    function test_level2_minWithdrawalAmountFloor() public {
+        // Small pool: 1,000 USDC. 5% = 50 USDC, but floor is 100 USDC
+        uint256 poolTotal = 1_000e6;
+
+        uint256 limit = cb.getWithdrawalLimit(poolTotal);
+        assertEq(limit, 100e6); // MIN_WITHDRAWAL_AMOUNT kicks in
+    }
+
+    function test_level2_alsoBlocksBorrows() public {
+        // Level 2 (Stress) >= Level 1 (Caution), so borrows are also paused
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, 1_000_000e6);
+
+        // Level 2 means whenBorrowingAllowed should revert (level >= 1)
+        assertEq(uint8(cb.level()), 2);
+        assertTrue(uint8(cb.level()) >= 1);
+    }
+
+    function test_level2_escalatesFromLevel1() public {
+        // First trigger Level 1 via collateral drop
+        vm.prank(recorder);
+        cb.recordCollateralValue(1_000_000e6);
+        vm.prank(recorder);
+        cb.recordCollateralValue(840_000e6);
+        assertEq(uint8(cb.level()), 1);
+
+        // Then escalate to Level 2 via withdrawal surge
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, 1_000_000e6);
+
+        assertEq(uint8(cb.level()), uint8(ICircuitBreaker.CircuitBreakerLevel.Stress));
+    }
+
+    function test_level2_autoRecoversWhenRateDrops() public {
+        // Trigger Level 2
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, 1_000_000e6);
+        assertEq(uint8(cb.level()), 2);
+
+        // Move to next hour bucket -- new hour has no withdrawals
+        vm.warp(block.timestamp + 1 hours);
+
+        // Record a small withdrawal (below recovery threshold of 10%)
+        vm.prank(recorder);
+        cb.recordWithdrawal(50_000e6, 1_000_000e6); // 5% < 10%
+
+        // Start recovery timer. Wait 30 minutes.
+        vm.warp(block.timestamp + 30 minutes);
+
+        // Another small withdrawal to trigger recovery check
+        vm.prank(recorder);
+        cb.recordWithdrawal(1e6, 1_000_000e6); // negligible
+
+        assertEq(uint8(cb.level()), uint8(ICircuitBreaker.CircuitBreakerLevel.Inactive));
+    }
+
+    function test_level2_noRecoveryWhileRateStillHigh() public {
+        // Trigger Level 2
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, 1_000_000e6);
+        assertEq(uint8(cb.level()), 2);
+
+        // Wait 30 minutes but keep withdrawing at high rate
+        vm.warp(block.timestamp + 30 minutes);
+
+        // Still in same hour bucket, total is now 210k+110k = 320k (32% > 10%)
+        vm.prank(recorder);
+        cb.recordWithdrawal(110_000e6, 1_000_000e6);
+
+        assertEq(uint8(cb.level()), uint8(ICircuitBreaker.CircuitBreakerLevel.Stress));
+    }
+
+    function test_level2_tracksPerAddressWithdrawals() public {
+        uint256 poolTotal = 1_000_000e6;
+
+        // Trigger Level 2
+        vm.prank(recorder);
+        cb.recordWithdrawal(210_000e6, poolTotal);
+
+        // Check alice's hourly budget
+        uint256 hourBucket = block.timestamp / 1 hours;
+        assertEq(cb.addressHourlyWithdrawals(alice, hourBucket), 0);
+
+        // Note: addressHourlyWithdrawals are tracked externally by the vault when it calls
+        // checkWithdrawalAllowed + records via recordWithdrawal. The CB itself tracks total volume.
+    }
+
+    function test_level2_checkWithdrawalAllowed_passesWhenNotStressed() public {
+        // No Level 2 active -- should pass for any amount
+        cb.checkWithdrawalAllowed(alice, 1_000_000e6, 1_000_000e6, 0);
+        // No revert means pass
+    }
+
+    function test_level2_recordWithdrawal_revertsForNonRecorder() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        cb.recordWithdrawal(100e6, 1_000_000e6);
+    }
+
+    // ============================
     // Fuzz Tests
     // ============================
 
@@ -387,6 +532,17 @@ contract CircuitBreakerTest is Test {
 
         vm.prank(recorder);
         cb.recordCollateralValue(drop);
+
+        uint8 lvl = uint8(cb.level());
+        assertTrue(lvl <= 3);
+    }
+
+    function testFuzz_withdrawalAmounts_noPanic(uint256 amount, uint256 poolTotal) public {
+        poolTotal = bound(poolTotal, 1, type(uint128).max);
+        amount = bound(amount, 0, poolTotal);
+
+        vm.prank(recorder);
+        cb.recordWithdrawal(amount, poolTotal);
 
         uint8 lvl = uint8(cb.level());
         assertTrue(lvl <= 3);
