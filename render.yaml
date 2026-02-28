@@ -13,7 +13,7 @@ services:
     startCommand: node relayer/dist/index.js
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: "20"
       - key: NODE_ENV
         value: production
       - key: ARC_RPC_URL
