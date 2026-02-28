@@ -1,6 +1,7 @@
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { Providers } from "@/components/Providers";
 import { NetworkSwitchPrompt } from "@/components/feedback/NetworkSwitchPrompt";
+import { CircuitBreakerBanner } from "@/components/feedback/CircuitBreakerBanner";
 
 export default function AppLayout({
   children,
@@ -14,6 +15,7 @@ export default function AppLayout({
         <main className="flex-1 ml-60">
           <div className="max-w-[1280px] mx-auto px-8">
             <NetworkSwitchPrompt />
+            <CircuitBreakerBanner />
             {children}
           </div>
         </main>

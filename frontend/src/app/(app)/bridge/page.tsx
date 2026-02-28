@@ -6,6 +6,7 @@ import { ChainSelector } from "@/components/bridge/ChainSelector";
 import { BridgeProgress } from "@/components/bridge/BridgeProgress";
 import { NetworkBadge } from "@/components/bridge/NetworkBadge";
 import { TransactionStepper, type StepConfig } from "@/components/transaction/TransactionStepper";
+import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { useBridgeStatus } from "@/hooks/useBridgeStatus";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { ArrowRight02Icon } from "@hugeicons/core-free-icons";
@@ -62,6 +63,13 @@ export default function BridgePage() {
               {selectedChain === 5042002 ? "Local transfer (instant)" : "Cross-chain bridge"}
             </span>
           </div>
+
+          {/* Fee breakdown for bridge */}
+          <FeeBreakdown
+            gasEstimate={0.000035}
+            bridgeFee={selectedChain === 5042002 ? 0 : 0.25}
+            loading={false}
+          />
 
           {/* Simulate bridge start (for demo) */}
           {!activeBridgeNonce && (

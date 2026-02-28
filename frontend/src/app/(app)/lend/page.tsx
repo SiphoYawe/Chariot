@@ -22,6 +22,7 @@ import { useLenderPosition } from "@/hooks/useLenderPosition";
 import { EarningsCounter } from "@/components/vault/EarningsCounter";
 import { SharePriceDisplay } from "@/components/vault/SharePriceDisplay";
 import { UtilisationBar } from "@/components/vault/UtilisationBar";
+import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { Loading03Icon, CoinsSwapIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
@@ -208,6 +209,14 @@ function DepositPanel() {
         rows={previewRows}
         loading={metricsLoading && parsedAmount > 0}
       />
+
+      {/* Fee breakdown */}
+      {parsedAmount > 0 && (
+        <FeeBreakdown
+          gasEstimate={0.000012}
+          loading={metricsLoading}
+        />
+      )}
 
       {/* Approval step (only when amount > 0) */}
       {parsedAmount > 0 && !validationError && needsApproval && (
@@ -414,6 +423,14 @@ function WithdrawPanel() {
         rows={previewRows}
         loading={metricsLoading && parsedAmount > 0}
       />
+
+      {/* Fee breakdown */}
+      {parsedAmount > 0 && (
+        <FeeBreakdown
+          gasEstimate={0.000018}
+          loading={metricsLoading}
+        />
+      )}
 
       <Button
         onClick={handleWithdraw}

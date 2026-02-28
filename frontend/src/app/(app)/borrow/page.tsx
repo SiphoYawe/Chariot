@@ -12,6 +12,7 @@ import { BorrowPanel } from "@/components/borrow/BorrowPanel";
 import { RepayPanel } from "@/components/borrow/RepayPanel";
 import { BorrowRateDisplay } from "@/components/borrow/BorrowRateDisplay";
 import { RateBreakdown } from "@/components/vault/RateBreakdown";
+import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { ClosedPositionConfirmation } from "@/components/borrow/ClosedPositionConfirmation";
 import { HealthFactorGauge } from "@/components/risk/HealthFactorGauge";
 import { DataCard } from "@/components/data/DataCard";
@@ -285,6 +286,12 @@ export default function BorrowPage() {
                   }}
                 />
               )}
+
+              {/* Fee breakdown */}
+              <FeeBreakdown
+                gasEstimate={0.000024}
+                loading={position.isLoading}
+              />
 
               {/* Rate breakdown with education tooltips */}
               <RateBreakdown />
