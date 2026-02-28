@@ -54,14 +54,14 @@ export async function createOrConnectWallet(config: AgentConfig): Promise<Circle
     log("info", "wallet_set_created", { walletSetId });
   }
 
-  // Create new SCA wallet for gas abstraction
+  // Create new EOA wallet (SCA not supported on Arc Testnet)
   log("info", "wallet_creating", { walletSetId });
 
   const { data: walletData } = await client.createWallets({
     walletSetId,
     blockchains: ["EVM-TESTNET"],
     count: 1,
-    accountType: "SCA",
+    accountType: "EOA",
   });
 
   const wallet = walletData?.wallets?.[0];

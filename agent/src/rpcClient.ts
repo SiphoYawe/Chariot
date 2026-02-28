@@ -12,6 +12,11 @@ export function getPublicClient(config: AgentConfig): PublicClient {
         name: "Arc Testnet",
         nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
         rpcUrls: { default: { http: [config.arcRpcUrl] } },
+        contracts: {
+          multicall3: {
+            address: "0xcA11bde05977b3631167028862bE2a173976CA11",
+          },
+        },
       },
       transport: http(config.arcRpcUrl),
     });
