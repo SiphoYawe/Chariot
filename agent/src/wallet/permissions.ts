@@ -21,9 +21,17 @@ function getAllowedCalls(): Map<string, Set<string>> {
   ]);
 }
 
+const REQUIRED_ADDRESSES: Array<{ key: string; value: string }> = [
+  { key: "CHARIOT_VAULT", value: CHARIOT_ADDRESSES.CHARIOT_VAULT },
+  { key: "LENDING_POOL", value: CHARIOT_ADDRESSES.LENDING_POOL },
+  { key: "INTEREST_RATE_MODEL", value: CHARIOT_ADDRESSES.INTEREST_RATE_MODEL },
+];
+
 export function validateAddresses(): void {
-  if (!CHARIOT_ADDRESSES.CHARIOT_VAULT || CHARIOT_ADDRESSES.CHARIOT_VAULT === ("" as `0x${string}`)) {
-    throw new Error("CHARIOT_VAULT address is not configured in shared/addresses.ts");
+  for (const { key, value } of REQUIRED_ADDRESSES) {
+    if (!value || value === ("" as `0x${string}`)) {
+      throw new Error(`${key} address is not configured in shared/addresses.ts`);
+    }
   }
 }
 

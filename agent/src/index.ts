@@ -3,6 +3,9 @@
 
 import { loadConfig } from "./config.js";
 import { createOrConnectWallet } from "./wallet/circleWallet.js";
+import { validateAddresses } from "./wallet/permissions.js";
+import { runMonitorLoop } from "./monitor/monitorLoop.js";
+import type { ScoredAction } from "./decision/utilityCalculator.js";
 import { log } from "./logger.js";
 
 async function main() {
@@ -14,16 +17,27 @@ async function main() {
     maxRebalancesPerDay: config.maxRebalancesPerDay,
   });
 
+  // Validate contract addresses are configured
+  validateAddresses();
+
   const wallet = await createOrConnectWallet(config);
   log("info", "agent_ready", {
     walletId: wallet.walletId,
     walletAddress: wallet.walletAddress,
   });
 
-  // Monitoring loop will be wired in Story 7-2 / 7-3
-  log("info", "agent_wallet_initialized", {
-    message: "Wallet module ready -- monitoring loop pending Story 7-2",
-  });
+  // Placeholder executeAction -- will be replaced by rebalanceExecutor in Story 7-3
+  const executeAction = async (action: ScoredAction, emergency: boolean): Promise<void> => {
+    log("info", "action_pending_executor", {
+      type: action.type,
+      amount: action.amount.toString(),
+      emergency,
+      note: "Execution module pending Story 7-3",
+    });
+  };
+
+  // Start monitoring loop
+  await runMonitorLoop({ config, wallet, executeAction });
 }
 
 main().catch((error) => {
