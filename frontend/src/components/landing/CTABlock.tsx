@@ -1,18 +1,16 @@
 import Link from "next/link";
 
-export function HeroSection() {
+export function CTABlock() {
   return (
-    <section className="pt-36 pb-20">
+    <section className="bg-[#023436] py-20">
       <div className="max-w-[1200px] mx-auto px-8">
-        <div className="max-w-[800px] mx-auto text-center">
-          <h1 className="text-[3.5rem] font-bold leading-[1.1] tracking-tight text-[#023436] mb-8">
-            Your capital should never sit idle.
-          </h1>
-          <p className="text-lg leading-relaxed text-[#6B8A8D] mb-12 max-w-[640px] mx-auto">
-            Chariot is a crosschain lending protocol on Arc. Lenders earn dual
-            yield from borrower interest and T-bill returns -- even at low
-            utilisation. Borrowers deposit ETH on Ethereum and borrow USDC on
-            Arc in under two minutes.
+        <div className="max-w-[640px] mx-auto text-center">
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Your capital is waiting.
+          </h2>
+          <p className="text-lg leading-relaxed text-white/60 mb-10">
+            Whether you are earning dual yield as a lender or borrowing against
+            ETH without selling, Chariot is your vehicle to long-term wealth.
           </p>
           <div className="flex items-center justify-center gap-4 mb-6">
             <Link
@@ -28,8 +26,9 @@ export function HeroSection() {
               Start Borrowing
             </Link>
           </div>
-          <p className="text-sm text-[#6B8A8D]">
-            Sub-second finality. Transactions under $0.01. Powered by Arc.
+          <p className="text-sm text-white/40">
+            No lock-ups. No minimum deposit. Sub-second transactions under
+            $0.01.
           </p>
         </div>
       </div>

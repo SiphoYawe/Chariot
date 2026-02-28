@@ -1,42 +1,72 @@
 const lenderSteps = [
-  { number: 1, title: "Deposit USDC", description: "Supply USDC to the Chariot vault" },
-  { number: 2, title: "Receive chUSDC", description: "Get vault shares representing your position" },
-  { number: 3, title: "Earn Dual Yield", description: "Accrue T-bill yield + borrower interest" },
+  {
+    number: 1,
+    title: "Deposit USDC",
+    description:
+      "Connect your wallet and deposit USDC into the Chariot Vault. You receive chUSDC vault shares representing your position.",
+  },
+  {
+    number: 2,
+    title: "Earn Dual Yield",
+    description:
+      "Your deposit earns from two sources simultaneously -- borrower interest and T-bill returns on idle capital. Yield accrues to your vault shares in real time.",
+  },
+  {
+    number: 3,
+    title: "Withdraw Anytime",
+    description:
+      "Redeem your chUSDC shares for USDC plus all accrued earnings. No lock-ups. No penalties. Your capital, your timeline.",
+  },
 ];
 
 const borrowerSteps = [
-  { number: 1, title: "Deposit ETH", description: "Lock ETH collateral on Sepolia" },
-  { number: 2, title: "Bridge Collateral", description: "Collateral is bridged crosschain to Arc" },
-  { number: 3, title: "Borrow USDC", description: "Draw USDC against your collateral" },
+  {
+    number: 1,
+    title: "Deposit ETH on Ethereum",
+    description:
+      "Deposit ETH into the Chariot escrow contract on Ethereum. Your collateral is securely locked and bridged to Arc within seconds.",
+  },
+  {
+    number: 2,
+    title: "Collateral Arrives on Arc",
+    description:
+      "The bridge relayer confirms your deposit and mints BridgedETH on Arc. Your collateral value, health factor, and borrow capacity appear instantly.",
+  },
+  {
+    number: 3,
+    title: "Borrow USDC",
+    description:
+      "Borrow USDC against your collateral on Arc with sub-second finality. Repay on your own schedule -- no deadlines, no penalties for early repayment.",
+  },
 ];
 
 function StepFlow({
-  title,
+  label,
   steps,
 }: {
-  title: string;
+  label: string;
   steps: typeof lenderSteps;
 }) {
   return (
     <div>
-      <h3 className="text-lg font-semibold text-[#023436] mb-8">{title}</h3>
-      <div className="relative flex items-start gap-0">
-        {steps.map((step, idx) => (
-          <div key={step.number} className="flex-1 flex flex-col items-center text-center relative">
-            {/* Connecting line */}
-            {idx < steps.length - 1 && (
-              <div className="absolute top-4 left-[calc(50%+20px)] w-[calc(100%-40px)] h-px bg-[rgba(3,121,113,0.15)]" />
-            )}
-            {/* Step number circle */}
-            <div className="relative z-10 w-8 h-8 flex items-center justify-center bg-[#037971] text-white text-sm font-bold mb-4">
+      <p className="text-sm font-semibold text-[#03B5AA] uppercase tracking-wider mb-8">
+        {label}
+      </p>
+      <div className="relative space-y-8">
+        <div className="absolute left-5 top-10 bottom-5 w-px bg-[rgba(3,121,113,0.15)]" />
+        {steps.map((step) => (
+          <div key={step.number} className="flex gap-6 relative">
+            <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-[#037971] text-white text-sm font-bold relative z-10">
               {step.number}
             </div>
-            <p className="text-sm font-semibold text-[#023436] mb-1">
-              {step.title}
-            </p>
-            <p className="text-xs text-[#6B8A8D] leading-relaxed max-w-[160px]">
-              {step.description}
-            </p>
+            <div className="pt-1">
+              <h4 className="text-base font-semibold text-[#023436] mb-2">
+                {step.title}
+              </h4>
+              <p className="text-sm leading-relaxed text-[#6B8A8D]">
+                {step.description}
+              </p>
+            </div>
           </div>
         ))}
       </div>
@@ -46,13 +76,20 @@ function StepFlow({
 
 export function HowItWorksSection() {
   return (
-    <section className="max-w-[1200px] mx-auto px-8 py-24">
-      <h2 className="text-3xl font-bold text-[#023436] text-center mb-16">
-        How It Works
-      </h2>
-      <div className="grid grid-cols-2 gap-16">
-        <StepFlow title="For Lenders" steps={lenderSteps} />
-        <StepFlow title="For Borrowers" steps={borrowerSteps} />
+    <section id="how-it-works" className="py-20 bg-[#F8FAFA]">
+      <div className="max-w-[1200px] mx-auto px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl font-bold text-[#023436] mb-4">
+            How Chariot works.
+          </h2>
+          <p className="text-lg text-[#6B8A8D]">
+            Two paths. Both take under two minutes.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-20">
+          <StepFlow label="For Lenders" steps={lenderSteps} />
+          <StepFlow label="For Borrowers" steps={borrowerSteps} />
+        </div>
       </div>
     </section>
   );

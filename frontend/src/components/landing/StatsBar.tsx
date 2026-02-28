@@ -1,17 +1,17 @@
-export function StatsBar() {
-  const stats = [
-    { label: "Total Value Locked", value: "$0.00" },
-    { label: "Vault APY", value: "4.28%" },
-    { label: "Chains Supported", value: "2" },
-    { label: "Active Users", value: "0" },
-  ];
+const stats = [
+  { value: "$X.XX M", label: "Total Value Locked" },
+  { value: "X.XX%", label: "Current Supply Rate" },
+  { value: "2", label: "Supported Networks" },
+  { value: "< $0.01", label: "Average Cost" },
+];
 
+export function StatsBar() {
   return (
     <section className="bg-[#023436]">
-      <div className="max-w-[1200px] mx-auto px-8 py-6 flex items-center justify-between">
+      <div className="max-w-[1200px] mx-auto px-8 py-8 grid grid-cols-4 gap-8">
         {stats.map((stat) => (
           <div key={stat.label} className="text-center">
-            <p className="tabular-nums text-2xl font-bold text-white mb-1">
+            <p className="tabular-nums text-3xl font-bold text-white mb-2">
               {stat.value}
             </p>
             <p className="text-xs font-medium uppercase tracking-wider text-white/50">
