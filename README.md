@@ -94,15 +94,6 @@ Arc serves as the central clearing hub -- all lending, borrowing, and liquidatio
 |----------|---------|
 | **ETHEscrow** | [`0x42cAA0a88A42b92e1307E625e5253BE0dFABcCc2`](https://sepolia.etherscan.io/address/0x42cAA0a88A42b92e1307E625e5253BE0dFABcCc2) |
 
-### External Dependencies -- Arc Testnet
-
-| Contract | Address | Purpose |
-|----------|---------|---------|
-| **USDC** | `0x3600000000000000000000000000000000000000` | Gas token + lending asset (6 decimals ERC-20, 18 decimals native) |
-| **USYC** | `0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C` | Tokenized US Treasury bills (Hashnote) |
-| **USYC Teller** | `0x9fdF14c5B14173D74C08Af27AebFf39240dC105A` | Mint/redeem USYC |
-| **CCTP TokenMessengerV2** | `0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA` | Circle cross-chain USDC transfers |
-
 ## License
 
 MIT
