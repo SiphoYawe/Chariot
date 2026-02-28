@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { useAccount, useReadContract } from "wagmi";
+import { formatUnits } from "viem";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataCard } from "@/components/data/DataCard";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -13,11 +15,11 @@ import {
 import { ApprovalStep, type ApprovalState } from "@/components/transaction/ApprovalStep";
 import { TransactionConfirmation } from "@/components/feedback/TransactionConfirmation";
 import { ErrorState } from "@/components/feedback/ErrorState";
+import { EmptyState } from "@/components/feedback/EmptyState";
 import { useVaultMetrics } from "@/hooks/useVaultMetrics";
 import { useVaultDeposit } from "@/hooks/useVaultDeposit";
 import { useVaultWithdraw } from "@/hooks/useVaultWithdraw";
 import { PositionCard } from "@/components/collateral/PositionCard";
-import { EmptyState } from "@/components/feedback/EmptyState";
 import { useLenderPosition } from "@/hooks/useLenderPosition";
 import { EarningsCounter } from "@/components/vault/EarningsCounter";
 import { SharePriceDisplay } from "@/components/vault/SharePriceDisplay";
@@ -25,14 +27,15 @@ import { UtilisationBar } from "@/components/vault/UtilisationBar";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { YieldHistoryChart } from "@/components/charts/YieldHistoryChart";
 import { SharePriceChart } from "@/components/charts/SharePriceChart";
-import { Loading03Icon, CoinsSwapIcon } from "@hugeicons/core-free-icons";
+import { Loading03Icon, CoinsSwapIcon, Wallet03Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-
-// -- Mock user balances (replaced by wagmi useReadContract when deployed) --
-const MOCK_USDC_BALANCE = "10,000.00";
-const MOCK_USDC_BALANCE_RAW = 10_000;
-const MOCK_CHUSDC_BALANCE = "5,000.00";
-const MOCK_CHUSDC_BALANCE_RAW = 5_000;
+import {
+  ADDRESSES,
+  CHARIOT_ADDRESSES,
+  ERC20ABI,
+  ChariotVaultABI,
+  POLLING_INTERVAL_MS,
+} from "@chariot/shared";
 
 // ============================================================
 // Vault Stats Bar
@@ -76,6 +79,7 @@ function VaultStats() {
 
 function DepositPanel() {
   const [amount, setAmount] = useState("");
+  const { address } = useAccount();
   const { data: metrics, isLoading: metricsLoading } = useVaultMetrics();
   const {
     status,
@@ -87,14 +91,34 @@ function DepositPanel() {
     reset,
   } = useVaultDeposit();
 
+  // Read real USDC balance from on-chain
+  const { data: rawUsdcBalance, isLoading: balanceLoading } = useReadContract({
+    address: ADDRESSES.USDC as `0x${string}`,
+    abi: ERC20ABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
+
+  const usdcBalance = rawUsdcBalance !== undefined
+    ? Number(formatUnits(rawUsdcBalance as bigint, 6))
+    : 0;
+  const usdcBalanceDisplay = usdcBalance.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
   const parsedAmount = parseFloat(amount) || 0;
 
   // Validation
   const validationError = useMemo(() => {
     if (!amount || parsedAmount === 0) return undefined;
-    if (parsedAmount > MOCK_USDC_BALANCE_RAW) return "Insufficient USDC balance";
+    if (parsedAmount > usdcBalance) return "Insufficient USDC balance";
     return undefined;
-  }, [amount, parsedAmount]);
+  }, [amount, parsedAmount, usdcBalance]);
 
   const canDeposit =
     parsedAmount > 0 && !validationError && !needsApproval;
@@ -199,7 +223,8 @@ function DepositPanel() {
         value={amount}
         onChange={setAmount}
         tokenSymbol="USDC"
-        balance={MOCK_USDC_BALANCE}
+        balance={usdcBalanceDisplay}
+        balanceLoading={balanceLoading}
         decimals={2}
         error={validationError}
         disabled={status === "depositing"}
@@ -242,7 +267,7 @@ function DepositPanel() {
             Depositing...
           </span>
         ) : (
-          "Deposit"
+          "Deposit USDC"
         )}
       </Button>
     </div>
@@ -256,8 +281,25 @@ function DepositPanel() {
 function WithdrawPanel() {
   const [amount, setAmount] = useState("");
   const [denomination, setDenomination] = useState<"usdc" | "chusdc">("usdc");
+  const { address } = useAccount();
   const { data: metrics, isLoading: metricsLoading } = useVaultMetrics();
   const { status, txHash, errorMessage, withdraw, reset } = useVaultWithdraw();
+
+  // Read real chUSDC (vault share) balance from on-chain
+  const { data: rawShareBalance, isLoading: shareBalanceLoading } = useReadContract({
+    address: CHARIOT_ADDRESSES.CHARIOT_VAULT,
+    abi: ChariotVaultABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
+
+  const shareBalance = rawShareBalance !== undefined
+    ? Number(formatUnits(rawShareBalance as bigint, 6))
+    : 0;
 
   const parsedAmount = parseFloat(amount) || 0;
   const sharePrice = metrics?.sharePrice ?? 1.0;
@@ -269,14 +311,16 @@ function WithdrawPanel() {
     denomination === "chusdc" ? parsedAmount : parsedAmount / sharePrice;
 
   const maxBalance =
-    denomination === "usdc" ? MOCK_CHUSDC_BALANCE_RAW * sharePrice : MOCK_CHUSDC_BALANCE_RAW;
-  const balanceDisplay =
-    denomination === "usdc"
-      ? (MOCK_CHUSDC_BALANCE_RAW * sharePrice).toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })
-      : MOCK_CHUSDC_BALANCE;
+    denomination === "usdc" ? shareBalance * sharePrice : shareBalance;
+  const balanceDisplay = denomination === "usdc"
+    ? (shareBalance * sharePrice).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : shareBalance.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 6,
+      });
 
   // Validation
   const validationError = useMemo(() => {
@@ -407,6 +451,7 @@ function WithdrawPanel() {
         onChange={setAmount}
         tokenSymbol={denomination === "usdc" ? "USDC" : "chUSDC"}
         balance={balanceDisplay}
+        balanceLoading={shareBalanceLoading}
         decimals={denomination === "usdc" ? 2 : 6}
         error={validationError}
         disabled={status === "withdrawing"}
@@ -509,67 +554,83 @@ function LenderPositionSection() {
 // ============================================================
 
 export default function LendPage() {
+  const { isConnected } = useAccount();
+
   return (
     <div className="pb-12">
       <PageHeader title="Lend" />
 
-      {/* Vault stats summary */}
+      {/* Vault stats summary -- always visible */}
       <section className="mb-8">
         <VaultStats />
       </section>
 
-      {/* Real-time earnings & share price */}
-      <section className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-[520px]">
-        <EarningsCounter />
-        <SharePriceDisplay />
-      </section>
+      {!isConnected ? (
+        <EmptyState
+          icon={Wallet03Icon}
+          headline="Connect Wallet"
+          description="Connect your wallet to deposit USDC and start earning dual yield from T-Bill-backed USYC and borrower interest."
+        />
+      ) : (
+        <>
+          {/* Main 2-column layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,440px)] gap-8">
+            {/* Left column -- Info & Charts */}
+            <div className="space-y-6">
+              {/* Earnings & Share Price side-by-side */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <EarningsCounter />
+                <SharePriceDisplay />
+              </div>
 
-      {/* Lender position or empty state */}
-      <section className="mb-8 max-w-[520px]">
-        <LenderPositionSection />
-      </section>
+              {/* Lender position */}
+              <LenderPositionSection />
 
-      {/* Yield & Share Price Charts */}
-      <section className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <YieldHistoryChart />
-        <SharePriceChart />
-      </section>
+              {/* Charts */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <YieldHistoryChart />
+                <SharePriceChart />
+              </div>
 
-      {/* Utilisation bar */}
-      <section className="mb-8 max-w-[520px]">
-        <UtilisationBar />
-      </section>
+              {/* Utilisation */}
+              <UtilisationBar />
+            </div>
 
-      {/* Deposit / Withdraw tabs */}
-      <section className="max-w-[520px]">
-        <Tabs defaultValue="deposit">
-          <TabsList
-            variant="line"
-            className="w-full border-b border-[rgba(3,121,113,0.15)] mb-6"
-          >
-            <TabsTrigger
-              value="deposit"
-              className="px-6 pb-3 text-sm font-medium data-[state=active]:text-[#03B5AA] data-[state=inactive]:text-[#6B8A8D]"
-            >
-              Deposit
-            </TabsTrigger>
-            <TabsTrigger
-              value="withdraw"
-              className="px-6 pb-3 text-sm font-medium data-[state=active]:text-[#03B5AA] data-[state=inactive]:text-[#6B8A8D]"
-            >
-              Withdraw
-            </TabsTrigger>
-          </TabsList>
+            {/* Right column -- Action Panel */}
+            <div>
+              <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6 sticky top-6">
+                <Tabs defaultValue="deposit">
+                  <TabsList
+                    variant="line"
+                    className="w-full border-b border-[rgba(3,121,113,0.15)] mb-6"
+                  >
+                    <TabsTrigger
+                      value="deposit"
+                      className="px-6 pb-3 text-sm font-medium data-[state=active]:text-[#03B5AA] data-[state=inactive]:text-[#6B8A8D]"
+                    >
+                      Deposit
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="withdraw"
+                      className="px-6 pb-3 text-sm font-medium data-[state=active]:text-[#03B5AA] data-[state=inactive]:text-[#6B8A8D]"
+                    >
+                      Withdraw
+                    </TabsTrigger>
+                  </TabsList>
 
-          <TabsContent value="deposit">
-            <DepositPanel />
-          </TabsContent>
+                  <TabsContent value="deposit">
+                    <DepositPanel />
+                  </TabsContent>
 
-          <TabsContent value="withdraw">
-            <WithdrawPanel />
-          </TabsContent>
-        </Tabs>
-      </section>
+                  <TabsContent value="withdraw">
+                    <WithdrawPanel />
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
