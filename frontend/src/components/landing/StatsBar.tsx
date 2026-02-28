@@ -1,5 +1,5 @@
 const stats = [
-  { value: "$1.2M", label: "Total Value Locked" },
+  { value: "20x", label: "vs Traditional Yield" },
   { value: "3.60%", label: "Current Supply Rate" },
   { value: "2", label: "Supported Networks" },
   { value: "< $0.01", label: "Average Cost" },

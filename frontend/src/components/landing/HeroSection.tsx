@@ -6,7 +6,7 @@ export function HeroSection() {
       <div className="max-w-[1200px] mx-auto px-8">
         <div className="max-w-[800px] mx-auto text-center">
           <h1 className="text-[4rem] font-bold leading-[1.1] tracking-tight text-[#023436] mb-8">
-            Your capital should never sit idle.
+            Earn yield on every dollar. Borrow against ETH without selling.
           </h1>
           <p className="text-xl leading-relaxed text-[#3D5C5F] mb-12 max-w-[640px] mx-auto">
             Chariot is a crosschain lending protocol on Arc. Lenders earn dual
