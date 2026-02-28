@@ -9,7 +9,7 @@ services:
     region: oregon
     plan: starter
     numInstances: 1
-    buildCommand: corepack enable && NODE_ENV=development pnpm install --frozen-lockfile && pnpm --filter @chariot/shared build && pnpm --filter @chariot/relayer build
+    buildCommand: npm install -g pnpm@8.15.6 && NODE_ENV=development pnpm install --frozen-lockfile && pnpm --filter @chariot/shared build && pnpm --filter @chariot/relayer build
     startCommand: node relayer/dist/index.js
     envVars:
       - key: NODE_VERSION
@@ -37,7 +37,7 @@ services:
     region: oregon
     plan: starter
     numInstances: 1
-    buildCommand: corepack enable && NODE_ENV=development pnpm install --frozen-lockfile && pnpm --filter @chariot/shared build && pnpm --filter @chariot/agent build
+    buildCommand: npm install -g pnpm@8.15.6 && NODE_ENV=development pnpm install --frozen-lockfile && pnpm --filter @chariot/shared build && pnpm --filter @chariot/agent build
     startCommand: node agent/dist/index.js
     envVars:
       - key: NODE_VERSION
