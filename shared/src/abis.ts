@@ -28,6 +28,24 @@ export const ChariotVaultABI = [
     outputs: [{ name: "shares", type: "uint256" }],
     stateMutability: "nonpayable",
   },
+  {
+    type: "function",
+    name: "rebalance",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "getSupplyRate",
+    inputs: [
+      { name: "borrowRate", type: "uint256" },
+      { name: "utilisation", type: "uint256" },
+      { name: "usycYield", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "pure",
+  },
 ] as const;
 
 export const LendingPoolABI = [
@@ -334,7 +352,29 @@ export const RiskParameterEngineABI = [
   },
 ] as const;
 
-export const CircuitBreakerABI = [] as const;
+export const CircuitBreakerABI = [
+  {
+    type: "function",
+    name: "circuitBreakerLevel",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "triggerCircuitBreaker",
+    inputs: [{ name: "level", type: "uint8" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "resumeCircuitBreaker",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+] as const;
 
 export const ERC20ABI = [
   {
