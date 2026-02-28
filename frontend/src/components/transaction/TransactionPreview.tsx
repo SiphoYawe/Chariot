@@ -7,8 +7,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { InformationCircleIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconInfoCircleFilled } from "@tabler/icons-react";
 
 export interface PreviewRow {
   label: string;
@@ -59,8 +58,7 @@ export function TransactionPreview({
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="cursor-help">
-                            <HugeiconsIcon
-                              icon={InformationCircleIcon}
+                            <IconInfoCircleFilled
                               size={14}
                               className="text-[#9CA3AF]"
                             />

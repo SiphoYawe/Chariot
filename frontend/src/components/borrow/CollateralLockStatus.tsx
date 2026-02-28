@@ -1,7 +1,6 @@
 "use client";
 
-import { HugeiconsIcon } from "@hugeicons/react";
-import { SquareLock02Icon, SquareUnlock02Icon } from "@hugeicons/core-free-icons";
+import { IconLockFilled, IconLockOpen } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
 interface CollateralLockStatusProps {
@@ -33,7 +32,7 @@ export function CollateralLockStatus({
           className
         )}
       >
-        <HugeiconsIcon icon={SquareLock02Icon} size={20} className="text-[#D97706] shrink-0" />
+        <IconLockFilled size={20} className="text-[#D97706] shrink-0" />
         <div>
           <span className="text-sm font-medium text-[#023436] font-[family-name:var(--font-heading)]">
             Locked
@@ -53,7 +52,7 @@ export function CollateralLockStatus({
         className
       )}
     >
-      <HugeiconsIcon icon={SquareUnlock02Icon} size={20} className="text-[#16A34A] shrink-0" />
+      <IconLockOpen size={20} className="text-[#16A34A] shrink-0" />
       <div>
         <span className="text-sm font-medium text-[#023436] font-[family-name:var(--font-heading)]">
           Unlocked -- withdraw available

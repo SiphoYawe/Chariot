@@ -1,7 +1,6 @@
 "use client";
 
-import { ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconArrowUpRight } from "@tabler/icons-react";
 import type { Transaction } from "@/types/transaction";
 
 const ARC_EXPLORER_BASE = "https://testnet.arcscan.app";
@@ -94,7 +93,7 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
               className="inline-flex items-center gap-1 text-[#03B5AA] hover:text-[#037971] transition-colors"
             >
               {truncateHash(transaction.txHash)}
-              <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} />
+              <IconArrowUpRight size={14} />
             </a>
           }
         />

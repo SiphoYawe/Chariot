@@ -1,5 +1,4 @@
-import { Alert02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconAlertTriangleFilled } from "@tabler/icons-react";
 
 interface ErrorStateProps {
   message?: string;
@@ -12,7 +11,7 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <div className="bg-[#F8FAFA] border border-[rgba(3,121,113,0.15)] p-6 flex flex-col items-center justify-center text-center">
-      <HugeiconsIcon icon={Alert02Icon} size={32} className="text-[#F59E0B] mb-3" />
+      <IconAlertTriangleFilled size={32} className="text-[#F59E0B] mb-3" />
       <p className="text-sm text-[#6B8A8D] max-w-md">{message}</p>
       {onRetry && (
         <button

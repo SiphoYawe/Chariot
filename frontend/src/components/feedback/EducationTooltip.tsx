@@ -9,8 +9,7 @@ import {
   EDUCATION_CONTENT,
   type EducationTerm,
 } from "@/lib/educationContent";
-import { InformationCircleIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconInfoCircleFilled } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
 interface EducationTooltipProps {
@@ -35,11 +34,7 @@ export function EducationTooltip({ term, className }: EducationTooltipProps) {
           )}
           aria-label={`Learn about ${content.title}`}
         >
-          <HugeiconsIcon
-            icon={InformationCircleIcon}
-            size={16}
-            className="text-[#9CA3AF] hover:text-[#6B8A8D] transition-colors"
-          />
+          <IconInfoCircleFilled size={16} className="text-[#9CA3AF] hover:text-[#6B8A8D] transition-colors" />
         </button>
       </PopoverTrigger>
       <PopoverContent

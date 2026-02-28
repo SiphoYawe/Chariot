@@ -1,7 +1,6 @@
 "use client";
 
-import { Tick01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconCircleCheckFilled } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 
 interface TransactionConfirmationProps {
@@ -30,7 +29,7 @@ export function TransactionConfirmation({
     <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6 flex flex-col items-center text-center">
       {/* Teal checkmark */}
       <div className="w-14 h-14 bg-[#03B5AA]/10 flex items-center justify-center mb-4">
-        <HugeiconsIcon icon={Tick01Icon} size={28} className="text-[#03B5AA]" />
+        <IconCircleCheckFilled size={28} className="text-[#03B5AA]" />
       </div>
 
       <h3 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-[#023436] mb-4">

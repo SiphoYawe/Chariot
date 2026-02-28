@@ -1,31 +1,20 @@
 "use client";
 
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  ArrowDown01Icon,
-  ArrowUp01Icon,
-  MoneyReceiveSquareIcon,
-  MoneySendSquareIcon,
-  Shield01Icon,
-  Shield02Icon,
-  AlertDiamondIcon,
-  ArrowDataTransferHorizontalIcon,
-} from "@hugeicons/core-free-icons";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import type { IconSvgElement } from "@hugeicons/react";
+import { IconArrowDownCircleFilled, IconArrowUpCircleFilled, IconCoinFilled, IconSend, IconShieldFilled, IconShieldCheckFilled, IconAlertTriangleFilled, IconArrowsExchange, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import type { Icon } from "@tabler/icons-react";
 import type { Transaction, TransactionType } from "@/types/transaction";
 import { TRANSACTION_TYPE_LABELS } from "@/types/transaction";
 import { TransactionDetail } from "./TransactionDetail";
 
-const TYPE_ICONS: Record<TransactionType, IconSvgElement> = {
-  deposit: ArrowDown01Icon,
-  withdrawal: ArrowUp01Icon,
-  borrow: MoneyReceiveSquareIcon,
-  repay: MoneySendSquareIcon,
-  collateral_deposit: Shield01Icon,
-  collateral_withdrawal: Shield02Icon,
-  liquidation: AlertDiamondIcon,
-  bridge: ArrowDataTransferHorizontalIcon,
+const TYPE_ICONS: Record<TransactionType, Icon> = {
+  deposit: IconArrowDownCircleFilled,
+  withdrawal: IconArrowUpCircleFilled,
+  borrow: IconCoinFilled,
+  repay: IconSend,
+  collateral_deposit: IconShieldFilled,
+  collateral_withdrawal: IconShieldCheckFilled,
+  liquidation: IconAlertTriangleFilled,
+  bridge: IconArrowsExchange,
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -79,7 +68,7 @@ export function TransactionRow({
   expanded,
   onToggle,
 }: TransactionRowProps) {
-  const icon = TYPE_ICONS[transaction.type];
+  const IconComp = TYPE_ICONS[transaction.type];
   const label = TRANSACTION_TYPE_LABELS[transaction.type];
 
   return (
@@ -91,7 +80,7 @@ export function TransactionRow({
       >
         {/* Icon */}
         <div className="w-9 h-9 flex items-center justify-center bg-[#F8FAFA] shrink-0">
-          <HugeiconsIcon icon={icon} size={18} className="text-[#037971]" />
+          <IconComp size={18} className="text-[#037971]" />
         </div>
 
         {/* Type & timestamp */}
@@ -118,9 +107,9 @@ export function TransactionRow({
 
         {/* Chevron */}
         {expanded ? (
-          <ChevronUp size={16} className="text-[#6B8A8D] shrink-0" />
+          <IconChevronUp size={16} className="text-[#6B8A8D] shrink-0" />
         ) : (
-          <ChevronDown size={16} className="text-[#6B8A8D] shrink-0" />
+          <IconChevronDown size={16} className="text-[#6B8A8D] shrink-0" />
         )}
       </button>
 

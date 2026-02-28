@@ -1,21 +1,20 @@
-import { ProfitIcon, Globe02Icon, ShieldBlockchainIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconTrendingUp, IconGlobeFilled, IconShieldFilled } from "@tabler/icons-react";
 
 const features = [
   {
-    icon: ProfitIcon,
+    icon: IconTrendingUp,
     title: "Dual-Yield Vault",
     description:
       "Earn combined APY from T-bill yield and borrower interest in a single deposit. Your USDC works harder through two revenue streams.",
   },
   {
-    icon: Globe02Icon,
+    icon: IconGlobeFilled,
     title: "Crosschain Lending",
     description:
       "Deposit ETH collateral on Sepolia and borrow USDC on Arc. Seamless bridging handles the crosschain complexity for you.",
   },
   {
-    icon: ShieldBlockchainIcon,
+    icon: IconShieldFilled,
     title: "Dynamic Risk",
     description:
       "Automated risk management powered by oracle-driven rates. Dynamic LTV adjustments and liquidation parameters protect the protocol.",
@@ -35,11 +34,10 @@ export function FeaturesSection() {
             className="bg-white p-6 border border-[rgba(3,121,113,0.15)]"
           >
             <div className="w-10 h-10 flex items-center justify-center bg-[#F8FAFA] mb-5">
-              <HugeiconsIcon
-                icon={feature.icon}
+              <feature.icon
                 size={20}
                 color="#037971"
-                strokeWidth={1.5}
+                stroke={1.5}
               />
             </div>
             <h3 className="text-lg font-semibold text-[#023436] mb-3">

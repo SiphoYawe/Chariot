@@ -1,7 +1,6 @@
 "use client";
 
-import { Tick02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconCircleCheckFilled } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
 export interface StepConfig {
@@ -19,7 +18,7 @@ function StepIcon({ status }: { status: StepConfig["status"] }) {
   if (status === "completed") {
     return (
       <div className="w-7 h-7 bg-[#03B5AA] flex items-center justify-center shrink-0">
-        <HugeiconsIcon icon={Tick02Icon} size={16} className="text-white" />
+        <IconCircleCheckFilled size={16} className="text-white" />
       </div>
     );
   }

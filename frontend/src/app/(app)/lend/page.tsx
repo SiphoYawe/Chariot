@@ -27,8 +27,7 @@ import { UtilisationBar } from "@/components/vault/UtilisationBar";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { YieldHistoryChart } from "@/components/charts/YieldHistoryChart";
 import { SharePriceChart } from "@/components/charts/SharePriceChart";
-import { Loading03Icon, CoinsSwapIcon, Wallet03Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconLoader2, IconCoinFilled, IconWallet } from "@tabler/icons-react";
 import {
   ADDRESSES,
   CHARIOT_ADDRESSES,
@@ -263,7 +262,7 @@ function DepositPanel() {
       >
         {status === "depositing" ? (
           <span className="flex items-center gap-2">
-            <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
+            <IconLoader2 size={18} className="animate-spin" />
             Depositing...
           </span>
         ) : (
@@ -486,7 +485,7 @@ function WithdrawPanel() {
       >
         {status === "withdrawing" ? (
           <span className="flex items-center gap-2">
-            <HugeiconsIcon icon={Loading03Icon} size={18} className="animate-spin" />
+            <IconLoader2 size={18} className="animate-spin" />
             Withdrawing...
           </span>
         ) : (
@@ -521,7 +520,7 @@ function LenderPositionSection() {
   if (!hasPosition || !data) {
     return (
       <EmptyState
-        icon={CoinsSwapIcon}
+        icon={IconCoinFilled}
         headline="Start Earning"
         description="Deposit USDC to earn dual yield from T-Bill-backed USYC tokens and borrower interest. Your deposits are represented as chUSDC shares that appreciate over time."
         action={{
@@ -567,7 +566,7 @@ export default function LendPage() {
 
       {!isConnected ? (
         <EmptyState
-          icon={Wallet03Icon}
+          icon={IconWallet}
           headline="Connect Wallet"
           description="Connect your wallet to deposit USDC and start earning dual yield from T-Bill-backed USYC and borrower interest."
         />

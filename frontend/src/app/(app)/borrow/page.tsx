@@ -21,7 +21,7 @@ import { useETHUSDPrice } from "@/hooks/useETHUSDPrice";
 import { useUserPosition } from "@/hooks/useUserPosition";
 import { useBorrowRate } from "@/hooks/useBorrowRate";
 import { useAccount } from "wagmi";
-import { Wallet03Icon } from "@hugeicons/core-free-icons";
+import { IconWallet } from "@tabler/icons-react";
 import { RISK_PARAMS } from "@chariot/shared";
 
 function formatUsd(n: number): string {
@@ -131,7 +131,7 @@ export default function BorrowPage() {
       ) : !isConnected ? (
         /* Wallet not connected */
         <EmptyState
-          icon={Wallet03Icon}
+          icon={IconWallet}
           headline="Connect Wallet"
           description="Connect your wallet to deposit ETH collateral and borrow USDC."
           action={{
@@ -172,7 +172,7 @@ export default function BorrowPage() {
           </div>
 
           <EmptyState
-            icon={Wallet03Icon}
+            icon={IconWallet}
             headline="Deposit ETH to Start Borrowing"
             description="Lock ETH on Ethereum as collateral, bridge it to Arc, and borrow USDC at competitive rates. Your ETH remains safe in a smart contract escrow."
             action={{

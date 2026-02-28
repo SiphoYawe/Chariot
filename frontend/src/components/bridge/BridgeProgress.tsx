@@ -2,8 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import type { BridgeStep } from "@/hooks/useBridgeStatus";
-import { Tick02Icon, Loading03Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconCircleCheckFilled, IconLoader2 } from "@tabler/icons-react";
 
 interface BridgeProgressProps {
   /** Current active step */
@@ -80,14 +79,10 @@ export function BridgeProgress({
                 )}
               >
                 {state === "completed" && (
-                  <HugeiconsIcon icon={Tick02Icon} size={14} className="text-white" />
+                  <IconCircleCheckFilled size={14} className="text-white" />
                 )}
                 {state === "active" && (
-                  <HugeiconsIcon
-                    icon={Loading03Icon}
-                    size={14}
-                    className="text-white animate-spin"
-                  />
+                  <IconLoader2 size={14} className="text-white animate-spin" />
                 )}
                 {state === "pending" && (
                   <span className="text-[10px] text-[#6B8A8D] font-medium">

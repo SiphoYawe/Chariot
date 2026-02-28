@@ -4,22 +4,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount, useChainId } from "wagmi";
-import {
-  Home03Icon,
-  MoneyBag02Icon,
-  CreditCardIcon,
-  ArrowDataTransferHorizontalIcon,
-  Clock04Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconHomeFilled, IconMoneybag, IconCreditCardFilled, IconArrowsExchange, IconClockFilled } from "@tabler/icons-react";
 import { arcTestnet } from "@/lib/chains";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: Home03Icon },
-  { href: "/lend", label: "Lend", icon: MoneyBag02Icon },
-  { href: "/borrow", label: "Borrow", icon: CreditCardIcon },
-  { href: "/bridge", label: "Bridge", icon: ArrowDataTransferHorizontalIcon },
-  { href: "/history", label: "History", icon: Clock04Icon },
+  { href: "/dashboard", label: "Dashboard", icon: IconHomeFilled },
+  { href: "/lend", label: "Lend", icon: IconMoneybag },
+  { href: "/borrow", label: "Borrow", icon: IconCreditCardFilled },
+  { href: "/bridge", label: "Bridge", icon: IconArrowsExchange },
+  { href: "/history", label: "History", icon: IconClockFilled },
 ];
 
 export function AppSidebar() {
@@ -47,7 +40,7 @@ export function AppSidebar() {
                       : "text-white/80 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <HugeiconsIcon icon={item.icon} size={20} color="currentColor" />
+                  <item.icon size={20} color="currentColor" />
                   <span>{item.label}</span>
                 </Link>
               </li>

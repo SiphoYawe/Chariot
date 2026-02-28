@@ -13,7 +13,7 @@ import { useETHUSDPrice } from "@/hooks/useETHUSDPrice";
 import { useAccount, useBalance } from "wagmi";
 import { ethereumSepolia } from "@/lib/chains";
 import { RISK_PARAMS, ARC_CHAIN_ID } from "@chariot/shared";
-import { Wallet03Icon } from "@hugeicons/core-free-icons";
+import { IconWallet } from "@tabler/icons-react";
 
 function formatUsd(n: number): string {
   return n.toLocaleString("en-US", {
@@ -115,7 +115,7 @@ export default function BridgePage() {
 
       {!isConnected ? (
         <EmptyState
-          icon={Wallet03Icon}
+          icon={IconWallet}
           headline="Connect Wallet"
           description="Connect your wallet to bridge ETH from Ethereum to Arc as collateral."
         />

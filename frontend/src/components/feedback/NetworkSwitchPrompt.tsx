@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { arcTestnet } from "@/lib/chains";
-import { Alert02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { IconAlertTriangleFilled, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 
 export function NetworkSwitchPrompt() {
   const chainId = useChainId();
@@ -19,7 +17,7 @@ export function NetworkSwitchPrompt() {
     <div className="bg-[#F59E0B]/10 border border-[#F59E0B]/30 p-4 mb-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <HugeiconsIcon icon={Alert02Icon} size={20} className="text-[#F59E0B]" />
+          <IconAlertTriangleFilled size={20} className="text-[#F59E0B]" />
           <div>
             <p className="text-sm font-medium text-[#023436]">Wrong Network</p>
             <p className="text-xs text-[#6B8A8D]">Please switch to Arc Testnet to use Chariot</p>
@@ -37,7 +35,7 @@ export function NetworkSwitchPrompt() {
             className="px-2 py-1.5 text-xs text-[#6B8A8D] hover:text-[#023436] transition-colors flex items-center gap-1"
           >
             Manual
-            {showManual ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {showManual ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
           </button>
         </div>
       </div>

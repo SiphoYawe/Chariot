@@ -1,12 +1,11 @@
 "use client";
 
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
-import type { IconSvgElement } from "@hugeicons/react";
+import type { Icon } from "@tabler/icons-react";
 
 interface EmptyStateProps {
-  /** HugeIcons icon to display */
-  icon: IconSvgElement;
+  /** Tabler icon to display */
+  icon: Icon;
   /** Headline text (e.g. "Start Earning") */
   headline: string;
   /** Description text */
@@ -19,7 +18,7 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({
-  icon,
+  icon: IconComp,
   headline,
   description,
   action,
@@ -27,7 +26,7 @@ export function EmptyState({
   return (
     <div className="border border-[rgba(3,121,113,0.15)] bg-white p-8 flex flex-col items-center text-center">
       <div className="w-14 h-14 bg-[#F8FAFA] flex items-center justify-center mb-4">
-        <HugeiconsIcon icon={icon} size={28} className="text-[#03B5AA]" />
+        <IconComp size={28} className="text-[#03B5AA]" />
       </div>
 
       <h3 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-[#023436] mb-2">

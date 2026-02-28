@@ -2,8 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import type { CCTPBridgeStep } from "@/hooks/useCCTPBridgeStatus";
-import { Tick02Icon, Loading03Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconCircleCheckFilled, IconLoader2 } from "@tabler/icons-react";
 
 interface CCTPBridgeProgressProps {
   /** Current active step */
@@ -85,14 +84,10 @@ export function CCTPBridgeProgress({
                 )}
               >
                 {state === "completed" && (
-                  <HugeiconsIcon icon={Tick02Icon} size={14} className="text-white" />
+                  <IconCircleCheckFilled size={14} className="text-white" />
                 )}
                 {state === "active" && (
-                  <HugeiconsIcon
-                    icon={Loading03Icon}
-                    size={14}
-                    className="text-white animate-spin"
-                  />
+                  <IconLoader2 size={14} className="text-white animate-spin" />
                 )}
                 {state === "pending" && (
                   <span className="text-[10px] text-[#6B8A8D] font-medium">

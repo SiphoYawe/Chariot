@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useCircuitBreakerStatus } from "@/hooks/useCircuitBreakerStatus";
 import { EducationTooltip } from "@/components/feedback/EducationTooltip";
-import { Alert02Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { IconAlertTriangleFilled, IconX } from "@tabler/icons-react";
 import type { CircuitBreakerLevel } from "@chariot/shared";
 
 interface LevelConfig {
@@ -74,8 +73,7 @@ export function CircuitBreakerBanner() {
       }}
     >
       {/* Alert icon */}
-      <HugeiconsIcon
-        icon={Alert02Icon}
+      <IconAlertTriangleFilled
         size={20}
         className="shrink-0 mt-0.5"
         style={{ color: config.iconColor }}
@@ -103,8 +101,7 @@ export function CircuitBreakerBanner() {
         className="shrink-0 p-1 hover:opacity-70 transition-opacity"
         aria-label="Dismiss alert"
       >
-        <HugeiconsIcon
-          icon={Cancel01Icon}
+        <IconX
           size={16}
           style={{ color: config.textColor }}
         />
