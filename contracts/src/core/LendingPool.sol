@@ -38,6 +38,7 @@ contract LendingPool is ChariotBase, ILendingPool {
     ICollateralManager private _collateralManager;
     IChariotVault private _vault;
     IERC20 private _usdc;
+    address private _primaryCollateralToken; // For volatility-aware interest accrual
 
     // -- Modifiers --
     modifier accruesInterest() {
@@ -250,6 +251,7 @@ contract LendingPool is ChariotBase, ILendingPool {
     event InterestRateModelUpdated(address indexed oldModel, address indexed newModel);
     event CollateralManagerUpdated(address indexed oldManager, address indexed newManager);
     event VaultUpdated(address indexed oldVault, address indexed newVault);
+    event PrimaryCollateralTokenUpdated(address indexed oldToken, address indexed newToken);
 
     // -- Admin Functions --
 
@@ -274,6 +276,19 @@ contract LendingPool is ChariotBase, ILendingPool {
         emit VaultUpdated(old, vault_);
     }
 
+    /// @notice Set the primary collateral token for volatility-aware interest accrual
+    /// @param token The primary collateral token address (e.g., BridgedETH)
+    function setPrimaryCollateralToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address old = _primaryCollateralToken;
+        _primaryCollateralToken = token;
+        emit PrimaryCollateralTokenUpdated(old, token);
+    }
+
+    /// @notice Get the primary collateral token address
+    function getPrimaryCollateralToken() external view returns (address) {
+        return _primaryCollateralToken;
+    }
+
     // -- Internal Functions --
 
     /// @dev Accrue interest based on time elapsed since last accrual
@@ -289,8 +304,10 @@ contract LendingPool is ChariotBase, ILendingPool {
         uint256 totalAssets = _vault.totalAssets();
         uint256 utilisation = totalAssets > 0 ? _interestRateModel.getUtilisation(_totalBorrowed, totalAssets) : 0;
 
-        // Get borrow rate
-        uint256 borrowRate = _interestRateModel.getBorrowRate(utilisation);
+        // Get borrow rate (volatility-aware when primary collateral is configured)
+        uint256 borrowRate = _primaryCollateralToken != address(0)
+            ? _interestRateModel.getBorrowRateWithVolatility(utilisation, _primaryCollateralToken)
+            : _interestRateModel.getBorrowRate(utilisation);
 
         // Calculate interest factor for this period
         // interestFactor = borrowRate * timeDelta / SECONDS_PER_YEAR
