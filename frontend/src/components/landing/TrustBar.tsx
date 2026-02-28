@@ -1,11 +1,10 @@
 import Image from "next/image";
 
 const partners = [
-  { name: "Arc", logo: "/logos/arc.svg", height: 28 },
-  { name: "Circle CCTP", logo: "/logos/circle.svg", height: 32 },
-  { name: "USYC / Hashnote", logo: "/logos/hashnote.svg", height: 32 },
-  { name: "Stork Network", logo: "/logos/stork.svg", height: 20 },
-  { name: "Ethereum", logo: "/logos/ethereum.svg", height: 32 },
+  { name: "Arc", logo: "/logos/arc-logo.svg", height: 36 },
+  { name: "Circle", logo: "/logos/circle-logo.png", height: 40 },
+  { name: "USDC", logo: "/logos/circle.svg", height: 40 },
+  { name: "Ethereum", logo: "/logos/ethereum.svg", height: 40 },
 ];
 
 export function TrustBar() {
