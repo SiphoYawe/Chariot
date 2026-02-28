@@ -5,6 +5,7 @@ import {ChariotBase} from "../base/ChariotBase.sol";
 import {ChariotMath} from "../libraries/ChariotMath.sol";
 import {ICollateralManager} from "../interfaces/ICollateralManager.sol";
 import {ILendingPool} from "../interfaces/ILendingPool.sol";
+import {IRiskParameterEngine} from "../interfaces/IRiskParameterEngine.sol";
 import {IStork} from "../interfaces/IStork.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -42,6 +43,7 @@ contract CollateralManager is ChariotBase, ICollateralManager {
     mapping(address => CollateralConfig) private _collateralConfigs;
     address[] private _supportedCollateralTokens;
     ILendingPool private _lendingPool;
+    IRiskParameterEngine private _riskParameterEngine;
     address private immutable _bridgedETH;
 
     // -- Events --
@@ -53,6 +55,7 @@ contract CollateralManager is ChariotBase, ICollateralManager {
         address indexed token, uint256 baseLTV, uint256 liquidationThreshold, uint256 liquidationBonus
     );
     event LendingPoolUpdated(address indexed oldPool, address indexed newPool);
+    event RiskParameterEngineUpdated(address indexed oldEngine, address indexed newEngine);
 
     // -- Errors --
     error InvalidLTV();
@@ -162,24 +165,28 @@ contract CollateralManager is ChariotBase, ICollateralManager {
         uint256 collateralValueUsdc = getCollateralValue(user, priceUpdates);
         if (collateralValueUsdc == 0) return 0;
 
-        // HF = (collateral_value * LIQUIDATION_THRESHOLD) / debt
+        // HF = (collateral_value * liquidation_threshold) / debt
         // Both collateralValueUsdc and debt are in 6 decimals (USDC)
         // Convert to WAD for precise division
         uint256 collateralWad = ChariotMath.usdcToWad(collateralValueUsdc);
         uint256 debtWad = ChariotMath.usdcToWad(debt);
 
-        uint256 thresholdValue = ChariotMath.wadMul(collateralWad, LIQUIDATION_THRESHOLD);
+        uint256 liqThreshold = _getActiveLiquidationThreshold();
+        uint256 thresholdValue = ChariotMath.wadMul(collateralWad, liqThreshold);
         return ChariotMath.wadDiv(thresholdValue, debtWad);
     }
 
-    /// @notice Get the effective LTV for MVP (static 75%)
-    function getEffectiveLTV() external pure returns (uint256) {
+    /// @notice Get the effective LTV -- delegates to RiskParameterEngine if set
+    function getEffectiveLTV() external view returns (uint256) {
+        if (address(_riskParameterEngine) != address(0)) {
+            return _riskParameterEngine.getEffectiveLTV(_bridgedETH);
+        }
         return BASE_LTV;
     }
 
-    /// @notice Get the liquidation threshold
-    function getLiquidationThreshold() external pure returns (uint256) {
-        return LIQUIDATION_THRESHOLD;
+    /// @notice Get the liquidation threshold -- delegates to RiskParameterEngine if set
+    function getLiquidationThreshold() external view returns (uint256) {
+        return _getActiveLiquidationThreshold();
     }
 
     /// @notice Get the BridgedETH token address
@@ -233,6 +240,14 @@ contract CollateralManager is ChariotBase, ICollateralManager {
     }
 
     // -- Admin Functions --
+
+    /// @notice Set the RiskParameterEngine for dynamic LTV/threshold
+    /// @param riskParameterEngine_ The RiskParameterEngine contract address
+    function setRiskParameterEngine(address riskParameterEngine_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address old = address(_riskParameterEngine);
+        _riskParameterEngine = IRiskParameterEngine(riskParameterEngine_);
+        emit RiskParameterEngineUpdated(old, riskParameterEngine_);
+    }
 
     /// @notice Set the LendingPool reference for debt checks
     /// @param lendingPool_ The LendingPool contract address
@@ -300,6 +315,14 @@ contract CollateralManager is ChariotBase, ICollateralManager {
     }
 
     // -- Internal Functions --
+
+    /// @dev Get the active liquidation threshold -- dynamic or static fallback
+    function _getActiveLiquidationThreshold() internal view returns (uint256) {
+        if (address(_riskParameterEngine) != address(0)) {
+            return _riskParameterEngine.getLiquidationThreshold(_bridgedETH);
+        }
+        return LIQUIDATION_THRESHOLD;
+    }
 
     /// @dev Validate collateral configuration parameters
     function _validateCollateralConfig(CollateralConfig calldata config) internal pure {
