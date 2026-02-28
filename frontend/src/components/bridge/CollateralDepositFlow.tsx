@@ -8,6 +8,8 @@ import { useBridgeStatus } from "@/hooks/useBridgeStatus";
 import { useETHUSDPrice } from "@/hooks/useETHUSDPrice";
 import { RISK_PARAMS } from "@chariot/shared";
 import { cn } from "@/lib/utils";
+import { useAccount, useBalance } from "wagmi";
+import { ethereumSepolia } from "@/lib/chains";
 
 interface CollateralDepositFlowProps {
   /** Callback when bridge completes and collateral is deposited */
@@ -32,6 +34,18 @@ export function CollateralDepositFlow({
   const escrow = useETHEscrowDeposit();
   const bridge = useBridgeStatus(escrow.nonce);
 
+  const { address } = useAccount();
+  const { data: ethBalanceData, isLoading: ethBalanceLoading } = useBalance({
+    address,
+    chainId: ethereumSepolia.id,
+    query: { enabled: !!address },
+  });
+
+  const ethBalance = ethBalanceData
+    ? Number(ethBalanceData.formatted)
+    : 0;
+  const ethBalanceDisplay = ethBalance.toFixed(4);
+
   const parsedAmount = parseFloat(amount) || 0;
   const price = ethPrice?.price ?? 0;
   const collateralValue = parsedAmount * price;
@@ -54,8 +68,11 @@ export function CollateralDepositFlow({
   };
 
   const handleMaxClick = () => {
-    // Mock: set a reasonable max ETH amount
-    setAmount("5.0");
+    if (ethBalance > 0) {
+      // Leave a small amount for gas
+      const maxDeposit = Math.max(0, ethBalance - 0.01);
+      setAmount(maxDeposit.toFixed(6));
+    }
   };
 
   return (
@@ -103,9 +120,12 @@ export function CollateralDepositFlow({
                 Max
               </button>
             </div>
-            {/* Mock balance */}
             <p className="text-xs text-[#6B8A8D] mt-1 tabular-nums">
-              Balance: 10.0000 ETH (Sepolia)
+              {ethBalanceLoading ? (
+                <span className="inline-block w-28 h-3 bg-[#F8FAFA] animate-pulse" />
+              ) : (
+                <>Balance: {ethBalanceDisplay} ETH (Sepolia)</>
+              )}
             </p>
           </div>
 

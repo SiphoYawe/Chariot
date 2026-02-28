@@ -24,54 +24,42 @@ function formatETH(amount: number): string {
   })} ETH`;
 }
 
-// Type-specific detail fields derived from transaction data
-// In production, these would come from event log data
 function getTypeSpecificFields(
   tx: Transaction
 ): { label: string; value: string }[] {
   switch (tx.type) {
     case "deposit":
       return [
-        { label: "Shares received", value: `${(tx.amount / 1.0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} chUSDC` },
-        { label: "Share price", value: "$1.000000" },
+        { label: "Asset", value: tx.asset },
+        { label: "Amount deposited", value: formatUSDC(tx.amount) },
       ];
     case "withdrawal":
       return [
-        { label: "Shares burned", value: `${(tx.amount / 1.0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} chUSDC` },
+        { label: "Asset", value: tx.asset },
         { label: "USDC received", value: formatUSDC(tx.amount) },
-        { label: "Yield earned", value: "$0.00" },
       ];
     case "borrow":
       return [
         { label: "Collateral token", value: "BridgedETH" },
-        { label: "Collateral value", value: "$4,875.00" },
-        { label: "Health factor after", value: "1.60" },
-        { label: "Borrow rate", value: "5.25%" },
+        { label: "Amount borrowed", value: formatUSDC(tx.amount) },
       ];
     case "repay":
       return [
         { label: "Amount repaid", value: formatUSDC(tx.amount) },
-        { label: "Remaining debt", value: formatUSDC(1300) },
-        { label: "Type", value: "Partial" },
       ];
     case "collateral_deposit":
       return [
         { label: "Token", value: "BridgedETH" },
         { label: "Amount", value: formatETH(tx.amount) },
-        { label: "USD value", value: `$${(tx.amount * 3250).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
       ];
     case "collateral_withdrawal":
       return [
         { label: "Token", value: "BridgedETH" },
         { label: "Amount", value: formatETH(tx.amount) },
-        { label: "USD value", value: `$${(tx.amount * 3250).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
       ];
     case "liquidation":
       return [
-        { label: "Liquidator", value: "0x1234...5678" },
-        { label: "Collateral seized", value: formatETH(0.26) },
         { label: "Debt repaid", value: formatUSDC(tx.amount) },
-        { label: "Bonus", value: "5.00%" },
       ];
     case "bridge":
       return [
@@ -90,7 +78,7 @@ interface TransactionDetailProps {
 
 export function TransactionDetail({ transaction }: TransactionDetailProps) {
   const typeFields = getTypeSpecificFields(transaction);
-  const gasFee = 0.000012; // Mock gas fee in USDC
+  const gasFee = 0.01; // Estimated gas fee in USDC (Arc Testnet)
 
   return (
     <div className="px-4 py-3 bg-[#F8FAFA] border-b border-[rgba(3,121,113,0.15)]">

@@ -11,7 +11,9 @@ import { TransactionStepper, type StepConfig } from "@/components/transaction/Tr
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { useBridgeUSDC } from "@/hooks/useBridgeUSDC";
 import { useCCTPBridgeStatus } from "@/hooks/useCCTPBridgeStatus";
-import { useAccount } from "wagmi";
+import { useAccount, useReadContract } from "wagmi";
+import { formatUnits } from "viem";
+import { ADDRESSES, ERC20ABI, POLLING_INTERVAL_MS } from "@chariot/shared";
 import { Wallet03Icon } from "@hugeicons/core-free-icons";
 import { CCTP_DOMAINS, CCTP_CHAIN_INFO, ARC_CHAIN_ID } from "@chariot/shared";
 
@@ -29,8 +31,20 @@ export default function BridgePage() {
   const { status, txHash, errorMessage, bridge, reset } = useBridgeUSDC();
   const cctpStatus = useCCTPBridgeStatus(txHash);
 
-  // Mock USDC balance (replace with real balance hook when contracts deployed)
-  const usdcBalance = 5000.0;
+  // Read real USDC balance on Arc
+  const { data: rawUsdcBalance } = useReadContract({
+    address: ADDRESSES.USDC as `0x${string}`,
+    abi: ERC20ABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      refetchInterval: POLLING_INTERVAL_MS,
+    },
+  });
+  const usdcBalance = rawUsdcBalance !== undefined
+    ? Number(formatUnits(rawUsdcBalance as bigint, 6))
+    : 0;
 
   const domain = CHAIN_TO_CCTP_DOMAIN[selectedChain];
   const chainInfo =
