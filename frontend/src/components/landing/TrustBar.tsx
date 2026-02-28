@@ -14,20 +14,16 @@ export function TrustBar() {
         <h2 className="text-center text-base font-semibold uppercase tracking-wider text-[#3D5C5F] mb-10">
           Built on trusted infrastructure.
         </h2>
-        <div className="flex items-center justify-center gap-12">
+        <div className="flex items-center justify-center gap-16">
           {partners.map((partner) => (
-            <div
+            <Image
               key={partner.name}
-              className="flex items-center justify-center px-8 py-6 border border-[rgba(3,121,113,0.15)] bg-white min-w-[180px] h-24"
-            >
-              <Image
-                src={partner.logo}
-                alt={partner.name}
-                width={140}
-                height={partner.height}
-                className="object-contain max-h-14"
-              />
-            </div>
+              src={partner.logo}
+              alt={partner.name}
+              width={140}
+              height={partner.height}
+              className="object-contain max-h-12"
+            />
           ))}
         </div>
       </div>
