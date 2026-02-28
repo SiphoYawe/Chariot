@@ -7,6 +7,7 @@ import {ILendingPool} from "../interfaces/ILendingPool.sol";
 import {IInterestRateModel} from "../interfaces/IInterestRateModel.sol";
 import {ICollateralManager} from "../interfaces/ICollateralManager.sol";
 import {IChariotVault} from "../interfaces/IChariotVault.sol";
+import {ICCTPBridge} from "../interfaces/ICCTPBridge.sol";
 import {IStork} from "../interfaces/IStork.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -38,6 +39,7 @@ contract LendingPool is ChariotBase, ILendingPool {
     ICollateralManager private _collateralManager;
     IChariotVault private _vault;
     IERC20 private _usdc;
+    ICCTPBridge private _cctpBridge;
     address private _primaryCollateralToken; // For volatility-aware interest accrual
 
     // -- Modifiers --
@@ -114,6 +116,68 @@ contract LendingPool is ChariotBase, ILendingPool {
 
         // 9. Emit event
         emit Borrowed(msg.sender, collateralToken, amount, healthFactor);
+    }
+
+    /// @notice Borrow USDC and bridge it to another chain via CCTP in a single transaction
+    /// @param collateralToken The collateral token used (BridgedETH)
+    /// @param amount Amount of USDC to borrow and bridge (6 decimals)
+    /// @param destinationDomain CCTP domain ID of destination chain (0=Ethereum, 3=Arbitrum, 6=Base)
+    /// @param mintRecipient Recipient address on destination chain (bytes32, left-padded)
+    /// @param priceUpdates Stork signed price data for oracle verification
+    function borrowAndBridge(
+        address collateralToken,
+        uint256 amount,
+        uint32 destinationDomain,
+        bytes32 mintRecipient,
+        StorkStructs.TemporalNumericValueInput[] calldata priceUpdates
+    ) external nonReentrant whenNotPaused whenBorrowingAllowed accruesInterest {
+        if (amount == 0) revert ZeroAmount();
+        if (address(_cctpBridge) == address(0)) revert CCTPBridgeNotSet();
+
+        // 1. Update oracle prices (pull-oracle pattern)
+        if (storkOracle != address(0) && priceUpdates.length > 0) {
+            IStork(storkOracle).updateTemporalNumericValuesV1(priceUpdates);
+        }
+
+        // 2. Get collateral value and effective LTV
+        uint256 collateralValueUsdc = _collateralManager.getCollateralValue(msg.sender, priceUpdates);
+        uint256 effectiveLTV = _collateralManager.getEffectiveLTV();
+
+        // 3. Get current debt
+        uint256 currentDebt = _getUserDebtInternal(msg.sender);
+
+        // 4. Validate: amount + existing debt <= collateral_value * LTV
+        uint256 maxBorrow =
+            ChariotMath.wadToUsdc(ChariotMath.wadMul(ChariotMath.usdcToWad(collateralValueUsdc), effectiveLTV));
+        if (currentDebt + amount > maxBorrow) revert ExceedsLTV();
+
+        // 5. Update borrower position
+        if (_positions[msg.sender].principal == 0) {
+            _positions[msg.sender] = BorrowerPosition({
+                principal: amount, interestIndex: _globalInterestIndex, lastAccrualTimestamp: block.timestamp
+            });
+        } else {
+            _positions[msg.sender].principal = currentDebt + amount;
+            _positions[msg.sender].interestIndex = _globalInterestIndex;
+            _positions[msg.sender].lastAccrualTimestamp = block.timestamp;
+        }
+
+        // 6. Update total borrowed
+        _totalBorrowed += amount;
+
+        // 7. Transfer USDC from vault to this contract
+        _vault.lend(amount);
+
+        // 8. Approve CCTPBridge and bridge USDC
+        _usdc.forceApprove(address(_cctpBridge), amount);
+        _cctpBridge.bridgeUSDC(amount, destinationDomain, mintRecipient);
+
+        // 9. Validate health factor > 1.0 post-borrow
+        uint256 healthFactor = _collateralManager.getHealthFactor(msg.sender, priceUpdates);
+        if (healthFactor < WAD) revert HealthFactorTooLow();
+
+        // 10. Emit event
+        emit BorrowedAndBridged(msg.sender, collateralToken, amount, destinationDomain, mintRecipient, healthFactor);
     }
 
     /// @notice Repay a partial amount of debt
@@ -251,6 +315,7 @@ contract LendingPool is ChariotBase, ILendingPool {
     event InterestRateModelUpdated(address indexed oldModel, address indexed newModel);
     event CollateralManagerUpdated(address indexed oldManager, address indexed newManager);
     event VaultUpdated(address indexed oldVault, address indexed newVault);
+    event CCTPBridgeUpdated(address indexed oldBridge, address indexed newBridge);
     event PrimaryCollateralTokenUpdated(address indexed oldToken, address indexed newToken);
 
     // -- Admin Functions --
@@ -274,6 +339,13 @@ contract LendingPool is ChariotBase, ILendingPool {
         address old = address(_vault);
         _vault = IChariotVault(vault_);
         emit VaultUpdated(old, vault_);
+    }
+
+    /// @notice Set or disable the CCTP bridge. Pass address(0) to disable bridging.
+    function setCCTPBridge(address cctpBridge_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address old = address(_cctpBridge);
+        _cctpBridge = ICCTPBridge(cctpBridge_);
+        emit CCTPBridgeUpdated(old, cctpBridge_);
     }
 
     /// @notice Set the primary collateral token for volatility-aware interest accrual

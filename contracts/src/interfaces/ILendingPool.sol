@@ -13,6 +13,14 @@ interface ILendingPool {
 
     // -- Events --
     event Borrowed(address indexed borrower, address indexed collateralToken, uint256 amount, uint256 healthFactor);
+    event BorrowedAndBridged(
+        address indexed borrower,
+        address indexed collateralToken,
+        uint256 amount,
+        uint32 destinationDomain,
+        bytes32 mintRecipient,
+        uint256 healthFactor
+    );
     event Repaid(address indexed borrower, uint256 amount, uint256 remainingDebt);
     event InterestAccrued(uint256 interestAmount, uint256 globalIndex, uint256 totalBorrowed);
 
@@ -22,11 +30,19 @@ interface ILendingPool {
     error InsufficientLiquidity();
     error NoPosition();
     error NoDebt();
+    error CCTPBridgeNotSet();
 
     // -- Functions --
     function borrow(
         address collateralToken,
         uint256 amount,
+        StorkStructs.TemporalNumericValueInput[] calldata priceUpdates
+    ) external;
+    function borrowAndBridge(
+        address collateralToken,
+        uint256 amount,
+        uint32 destinationDomain,
+        bytes32 mintRecipient,
         StorkStructs.TemporalNumericValueInput[] calldata priceUpdates
     ) external;
     function repay(uint256 amount) external;

@@ -93,6 +93,19 @@ export const LendingPoolABI = [
   },
   {
     type: "function",
+    name: "borrowAndBridge",
+    inputs: [
+      { name: "collateralToken", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "destinationDomain", type: "uint32" },
+      { name: "mintRecipient", type: "bytes32" },
+      { name: "priceUpdates", type: "tuple[]", components: [] },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
     name: "repay",
     inputs: [{ name: "amount", type: "uint256" }],
     outputs: [],
@@ -373,6 +386,56 @@ export const CircuitBreakerABI = [
     inputs: [],
     outputs: [],
     stateMutability: "nonpayable",
+  },
+] as const;
+
+export const CCTPBridgeABI = [
+  {
+    type: "function",
+    name: "bridgeUSDC",
+    inputs: [
+      { name: "amount", type: "uint256" },
+      { name: "destinationDomain", type: "uint32" },
+      { name: "mintRecipient", type: "bytes32" },
+    ],
+    outputs: [{ name: "nonce", type: "uint64" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "getSupportedChains",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "tuple[]",
+        components: [
+          { name: "domain", type: "uint32" },
+          { name: "name", type: "string" },
+          { name: "estimatedDeliverySeconds", type: "uint256" },
+          { name: "active", type: "bool" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "isChainSupported",
+    inputs: [{ name: "domain", type: "uint32" }],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+  {
+    type: "event",
+    name: "USDCBridged",
+    inputs: [
+      { name: "sender", type: "address", indexed: true },
+      { name: "destinationDomain", type: "uint32", indexed: true },
+      { name: "recipient", type: "bytes32", indexed: false },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "nonce", type: "uint64", indexed: false },
+    ],
   },
 ] as const;
 

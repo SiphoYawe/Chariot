@@ -22,6 +22,7 @@ export const CHARIOT_ADDRESSES = {
   CIRCUIT_BREAKER: "" as `0x${string}`,
   ETH_ESCROW: "" as `0x${string}`,
   BRIDGED_ETH: "" as `0x${string}`,
+  CCTP_BRIDGE: "" as `0x${string}`,
 } as const;
 
 export type AddressKey = keyof typeof ADDRESSES;

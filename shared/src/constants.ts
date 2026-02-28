@@ -60,6 +60,36 @@ export const VOLATILITY_PARAMS = {
   LIQUIDATION_BUFFER: 0.07, // 7% above effective LTV
 } as const;
 
+// CCTP domain IDs for cross-chain USDC bridging
+export const CCTP_DOMAINS = {
+  ETHEREUM: 0,
+  ARBITRUM: 3,
+  BASE: 6,
+  ARC_TESTNET: 26,
+} as const;
+
+// CCTP chain metadata for frontend display
+export const CCTP_CHAIN_INFO = {
+  [CCTP_DOMAINS.ETHEREUM]: {
+    name: "Ethereum",
+    estimatedDeliverySeconds: 1140,
+    explorerUrl: "https://sepolia.etherscan.io",
+  },
+  [CCTP_DOMAINS.ARBITRUM]: {
+    name: "Arbitrum",
+    estimatedDeliverySeconds: 1140,
+    explorerUrl: "https://sepolia.arbiscan.io",
+  },
+  [CCTP_DOMAINS.BASE]: {
+    name: "Base",
+    estimatedDeliverySeconds: 1140,
+    explorerUrl: "https://sepolia.basescan.org",
+  },
+} as const;
+
+// Circle Attestation API (sandbox)
+export const CIRCLE_ATTESTATION_API = "https://iris-api-sandbox.circle.com";
+
 // Agent configuration
 export const AGENT_CONFIG = {
   MONITORING_INTERVAL_MS: 60_000, // 60 seconds
