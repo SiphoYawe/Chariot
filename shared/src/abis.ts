@@ -218,7 +218,26 @@ export const LendingPoolABI = [
     inputs: [
       { name: "collateralToken", type: "address" },
       { name: "amount", type: "uint256" },
-      { name: "priceUpdates", type: "tuple[]", components: [] },
+      {
+        name: "priceUpdates",
+        type: "tuple[]",
+        components: [
+          {
+            name: "temporalNumericValue",
+            type: "tuple",
+            components: [
+              { name: "timestampNs", type: "uint64" },
+              { name: "quantizedValue", type: "int192" },
+            ],
+          },
+          { name: "id", type: "bytes32" },
+          { name: "publisherMerkleRoot", type: "bytes32" },
+          { name: "valueComputeAlgHash", type: "bytes32" },
+          { name: "r", type: "bytes32" },
+          { name: "s", type: "bytes32" },
+          { name: "v", type: "uint8" },
+        ],
+      },
     ],
     outputs: [],
     stateMutability: "nonpayable",
@@ -231,7 +250,26 @@ export const LendingPoolABI = [
       { name: "amount", type: "uint256" },
       { name: "destinationDomain", type: "uint32" },
       { name: "mintRecipient", type: "bytes32" },
-      { name: "priceUpdates", type: "tuple[]", components: [] },
+      {
+        name: "priceUpdates",
+        type: "tuple[]",
+        components: [
+          {
+            name: "temporalNumericValue",
+            type: "tuple",
+            components: [
+              { name: "timestampNs", type: "uint64" },
+              { name: "quantizedValue", type: "int192" },
+            ],
+          },
+          { name: "id", type: "bytes32" },
+          { name: "publisherMerkleRoot", type: "bytes32" },
+          { name: "valueComputeAlgHash", type: "bytes32" },
+          { name: "r", type: "bytes32" },
+          { name: "s", type: "bytes32" },
+          { name: "v", type: "uint8" },
+        ],
+      },
     ],
     outputs: [],
     stateMutability: "nonpayable",
@@ -322,7 +360,26 @@ export const CollateralManagerABI = [
     name: "getHealthFactor",
     inputs: [
       { name: "user", type: "address" },
-      { name: "priceUpdates", type: "tuple[]", components: [] },
+      {
+        name: "priceUpdates",
+        type: "tuple[]",
+        components: [
+          {
+            name: "temporalNumericValue",
+            type: "tuple",
+            components: [
+              { name: "timestampNs", type: "uint64" },
+              { name: "quantizedValue", type: "int192" },
+            ],
+          },
+          { name: "id", type: "bytes32" },
+          { name: "publisherMerkleRoot", type: "bytes32" },
+          { name: "valueComputeAlgHash", type: "bytes32" },
+          { name: "r", type: "bytes32" },
+          { name: "s", type: "bytes32" },
+          { name: "v", type: "uint8" },
+        ],
+      },
     ],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "nonpayable",
@@ -332,7 +389,26 @@ export const CollateralManagerABI = [
     name: "getCollateralValue",
     inputs: [
       { name: "user", type: "address" },
-      { name: "priceUpdates", type: "tuple[]", components: [] },
+      {
+        name: "priceUpdates",
+        type: "tuple[]",
+        components: [
+          {
+            name: "temporalNumericValue",
+            type: "tuple",
+            components: [
+              { name: "timestampNs", type: "uint64" },
+              { name: "quantizedValue", type: "int192" },
+            ],
+          },
+          { name: "id", type: "bytes32" },
+          { name: "publisherMerkleRoot", type: "bytes32" },
+          { name: "valueComputeAlgHash", type: "bytes32" },
+          { name: "r", type: "bytes32" },
+          { name: "s", type: "bytes32" },
+          { name: "v", type: "uint8" },
+        ],
+      },
     ],
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "nonpayable",
