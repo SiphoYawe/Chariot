@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { NetworkBadge, SUPPORTED_CHAINS, type ChainConfig } from "@/components/bridge/NetworkBadge";
 import { cn } from "@/lib/utils";
 
@@ -9,11 +8,13 @@ interface ChainOption extends ChainConfig {
   feePreview: string;
 }
 
+const findChain = (id: number) => SUPPORTED_CHAINS.find((c) => c.id === id)!;
+
 const CHAIN_OPTIONS: ChainOption[] = [
-  { ...SUPPORTED_CHAINS[0], estimatedTime: "Instant", feePreview: "No bridge fee" },
-  { ...SUPPORTED_CHAINS[1], estimatedTime: "~15 min", feePreview: "~$2.50 gas" },
-  { ...SUPPORTED_CHAINS[2], estimatedTime: "~5 min", feePreview: "~$0.50 gas" },
-  { ...SUPPORTED_CHAINS[3], estimatedTime: "~5 min", feePreview: "~$0.30 gas" },
+  { ...findChain(5042002), estimatedTime: "Instant", feePreview: "No bridge fee" },
+  { ...findChain(11155111), estimatedTime: "~15 min", feePreview: "~$2.50 gas" },
+  { ...findChain(84532), estimatedTime: "~5 min", feePreview: "~$0.50 gas" },
+  { ...findChain(421614), estimatedTime: "~5 min", feePreview: "~$0.30 gas" },
 ];
 
 interface ChainSelectorProps {
@@ -21,6 +22,8 @@ interface ChainSelectorProps {
   selectedChainId?: number;
   /** Callback when chain is selected */
   onSelect?: (chainId: number) => void;
+  /** Chain IDs to exclude from the list */
+  excludeChainIds?: number[];
   /** Optional className */
   className?: string;
 }
@@ -28,14 +31,12 @@ interface ChainSelectorProps {
 export function ChainSelector({
   selectedChainId = 5042002,
   onSelect,
+  excludeChainIds,
   className,
 }: ChainSelectorProps) {
-  const [selected, setSelected] = useState(selectedChainId);
-
-  const handleSelect = (chainId: number) => {
-    setSelected(chainId);
-    onSelect?.(chainId);
-  };
+  const filteredOptions = excludeChainIds?.length
+    ? CHAIN_OPTIONS.filter((c) => !excludeChainIds.includes(c.id))
+    : CHAIN_OPTIONS;
 
   return (
     <div className={cn("border border-[rgba(3,121,113,0.15)] bg-white p-6", className)}>
@@ -43,13 +44,16 @@ export function ChainSelector({
         Destination Chain
       </h3>
 
-      <div className="space-y-2">
-        {CHAIN_OPTIONS.map((chain) => {
-          const isSelected = chain.id === selected;
+      <div className="space-y-2" role="radiogroup" aria-label="Destination chain">
+        {filteredOptions.map((chain) => {
+          const isSelected = chain.id === selectedChainId;
           return (
             <button
               key={chain.id}
-              onClick={() => handleSelect(chain.id)}
+              role="radio"
+              aria-checked={isSelected}
+              aria-label={`Select ${chain.name} as destination chain`}
+              onClick={() => onSelect?.(chain.id)}
               className={cn(
                 "w-full flex items-center justify-between p-3 border transition-colors text-left",
                 isSelected
