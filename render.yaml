@@ -17,7 +17,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: ARC_RPC_URL
-        value: https://testnet-rpc.arc.ag
+        value: https://rpc.testnet.arc.network
       - key: ETH_ESCROW_ADDRESS
         value: "0x42cAA0a88A42b92e1307E625e5253BE0dFABcCc2"
       - key: BRIDGED_ETH_ADDRESS
@@ -45,7 +45,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: ARC_RPC_URL
-        value: https://testnet-rpc.arc.ag
+        value: https://rpc.testnet.arc.network
       - key: MONITOR_INTERVAL_MS
         value: "60000"
       - key: MAX_REBALANCES_PER_DAY
