@@ -21,6 +21,7 @@ import { EmptyState } from "@/components/feedback/EmptyState";
 import { useLenderPosition } from "@/hooks/useLenderPosition";
 import { EarningsCounter } from "@/components/vault/EarningsCounter";
 import { SharePriceDisplay } from "@/components/vault/SharePriceDisplay";
+import { UtilisationBar } from "@/components/vault/UtilisationBar";
 import { Loading03Icon, CoinsSwapIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
@@ -507,6 +508,11 @@ export default function LendPage() {
       {/* Lender position or empty state */}
       <section className="mb-8 max-w-[520px]">
         <LenderPositionSection />
+      </section>
+
+      {/* Utilisation bar */}
+      <section className="mb-8 max-w-[520px]">
+        <UtilisationBar />
       </section>
 
       {/* Deposit / Withdraw tabs */}

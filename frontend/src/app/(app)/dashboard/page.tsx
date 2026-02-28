@@ -6,6 +6,7 @@ import { BorrowRateDisplay } from "@/components/vault/BorrowRateDisplay";
 import { OracleDataDisplay } from "@/components/vault/OracleDataDisplay";
 import { RateTable } from "@/components/vault/RateTable";
 import { CircuitBreakerBanner } from "@/components/feedback/CircuitBreakerBanner";
+import { UtilisationBar } from "@/components/vault/UtilisationBar";
 import { DashboardLenderPosition } from "@/components/collateral/DashboardLenderPosition";
 
 export default function DashboardPage() {
@@ -33,6 +34,11 @@ export default function DashboardPage() {
       <section className="grid grid-cols-2 gap-6 mb-8">
         <YieldDisplay />
         <BorrowRateDisplay />
+      </section>
+
+      {/* Pool Utilisation */}
+      <section className="mb-8">
+        <UtilisationBar />
       </section>
 
       {/* Oracle Data */}

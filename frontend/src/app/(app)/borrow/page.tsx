@@ -11,6 +11,7 @@ import { BorrowerPositionCard } from "@/components/collateral/BorrowerPositionCa
 import { BorrowPanel } from "@/components/borrow/BorrowPanel";
 import { RepayPanel } from "@/components/borrow/RepayPanel";
 import { BorrowRateDisplay } from "@/components/borrow/BorrowRateDisplay";
+import { RateBreakdown } from "@/components/vault/RateBreakdown";
 import { ClosedPositionConfirmation } from "@/components/borrow/ClosedPositionConfirmation";
 import { HealthFactorGauge } from "@/components/risk/HealthFactorGauge";
 import { DataCard } from "@/components/data/DataCard";
@@ -284,6 +285,9 @@ export default function BorrowPage() {
                   }}
                 />
               )}
+
+              {/* Rate breakdown with education tooltips */}
+              <RateBreakdown />
 
               {/* Borrow rate display */}
               <BorrowRateDisplay
