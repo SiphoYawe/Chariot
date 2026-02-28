@@ -13,10 +13,6 @@ interface BorrowPanelProps {
   currentDebt: number;
   /** Current borrow rate (0-1) */
   borrowRate: number;
-  /** Current ETH price in USD */
-  ethPrice: number;
-  /** Collateral amount in ETH */
-  collateralAmountEth: number;
   /** Callback when borrow succeeds */
   onSuccess?: () => void;
   /** Optional className */
@@ -38,8 +34,6 @@ export function BorrowPanel({
   collateralValueUsdc,
   currentDebt,
   borrowRate,
-  ethPrice: _ethPrice,
-  collateralAmountEth: _collateralAmountEth,
   onSuccess,
   className,
 }: BorrowPanelProps) {

@@ -265,8 +265,6 @@ export default function BorrowPage() {
                   collateralValueUsdc={collateralValue}
                   currentDebt={outstandingDebt}
                   borrowRate={currentBorrowRate}
-                  ethPrice={price}
-                  collateralAmountEth={collateralEth}
                   onSuccess={handleRefreshAll}
                 />
               ) : (

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount, useChainId } from "wagmi";
@@ -28,7 +29,7 @@ export function AppSidebar() {
     <aside className="fixed left-0 top-0 h-screen w-60 flex flex-col bg-[#023436]">
       {/* Logo */}
       <div className="flex items-center gap-2 px-6 py-6">
-        <img src="/chariot-light.svg" alt="Chariot" className="w-[140px] h-auto" />
+        <Image src="/chariot-light.svg" alt="Chariot" width={140} height={32} />
       </div>
 
       {/* Navigation */}
