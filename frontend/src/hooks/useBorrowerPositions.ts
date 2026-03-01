@@ -9,7 +9,6 @@ import {
   POLLING_INTERVAL_MS,
   RISK_PARAMS,
   USDC_ERC20_DECIMALS,
-  DEMO_BORROWER_ADDRESS,
 } from "@chariot/shared";
 
 export interface BorrowerPosition {
@@ -26,8 +25,8 @@ const USDC_DIVISOR = 10 ** USDC_ERC20_DECIMALS;
 
 /**
  * Hook for fetching borrower positions.
- * Shows the connected user's position, falling back to the demo
- * borrower position when the connected wallet has no active position.
+ * Only queries and returns the connected wallet's position.
+ * Returns empty array when no wallet is connected or no active position exists.
  */
 export function useBorrowerPositions() {
   const { address } = useAccount();
@@ -66,32 +65,6 @@ export function useBorrowerPositions() {
     },
   });
 
-  // Read demo borrower debt (fallback)
-  const {
-    data: rawDemoDebt,
-    isLoading: loadingDemoDebt,
-    refetch: refetchDemoDebt,
-  } = useReadContract({
-    address: CHARIOT_ADDRESSES.LENDING_POOL,
-    abi: LendingPoolABI,
-    functionName: "getUserDebt",
-    args: [DEMO_BORROWER_ADDRESS],
-    query: { refetchInterval: POLLING_INTERVAL_MS },
-  });
-
-  // Read demo borrower collateral (fallback)
-  const {
-    data: rawDemoCollateral,
-    isLoading: loadingDemoCollateral,
-    refetch: refetchDemoCollateral,
-  } = useReadContract({
-    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
-    abi: CollateralManagerABI,
-    functionName: "getCollateralBalance",
-    args: [DEMO_BORROWER_ADDRESS, CHARIOT_ADDRESSES.BRIDGED_ETH],
-    query: { refetchInterval: POLLING_INTERVAL_MS },
-  });
-
   // Read ETH price
   const {
     data: rawEthPrice,
@@ -105,73 +78,45 @@ export function useBorrowerPositions() {
     query: { refetchInterval: POLLING_INTERVAL_MS },
   });
 
-  const isLoading = loadingPrice || loadingDemoDebt || loadingDemoCollateral ||
+  const isLoading = loadingPrice ||
     (!address ? false : loadingDebt || loadingCollateral);
   const isError = errorDebt || errorCollateral || errorPrice;
 
   const positions = useMemo((): BorrowerPosition[] => {
-    if (rawEthPrice === undefined) return [];
+    if (!address || rawEthPrice === undefined) return [];
 
     const ethPrice = Number(rawEthPrice) / Number(WAD);
 
-    function buildPosition(
-      addr: string,
-      debt: bigint,
-      collateral: bigint,
-    ): BorrowerPosition | null {
-      const debtNum = Number(debt) / USDC_DIVISOR;
-      const collateralAmount = Number(collateral) / Number(WAD);
-      const collateralValueUSD = collateralAmount * ethPrice;
+    if (rawDebt === undefined || rawCollateral === undefined) return [];
 
-      if (debtNum === 0 && collateralAmount === 0) return null;
+    const debtNum = Number(rawDebt as bigint) / USDC_DIVISOR;
+    const collateralAmount = Number(rawCollateral as bigint) / Number(WAD);
+    const collateralValueUSD = collateralAmount * ethPrice;
 
-      const healthFactor =
-        debtNum > 0
-          ? (collateralValueUSD *
-              RISK_PARAMS.BRIDGED_ETH.LIQUIDATION_THRESHOLD) /
-            debtNum
-          : Infinity;
+    if (debtNum === 0 && collateralAmount === 0) return [];
 
-      return {
-        address: addr,
-        collateralType: "BridgedETH",
-        collateralAmount,
-        collateralValueUSD,
-        debtAmount: debtNum,
-        healthFactor,
-      };
-    }
+    const healthFactor =
+      debtNum > 0
+        ? (collateralValueUSD *
+            RISK_PARAMS.BRIDGED_ETH.LIQUIDATION_THRESHOLD) /
+          debtNum
+        : Infinity;
 
-    // Try connected user first
-    if (address && rawDebt !== undefined && rawCollateral !== undefined) {
-      const pos = buildPosition(
-        address,
-        rawDebt as bigint,
-        rawCollateral as bigint,
-      );
-      if (pos) return [pos];
-    }
-
-    // Fall back to demo borrower
-    if (rawDemoDebt !== undefined && rawDemoCollateral !== undefined) {
-      const pos = buildPosition(
-        DEMO_BORROWER_ADDRESS,
-        rawDemoDebt as bigint,
-        rawDemoCollateral as bigint,
-      );
-      if (pos) return [pos];
-    }
-
-    return [];
-  }, [address, rawDebt, rawCollateral, rawDemoDebt, rawDemoCollateral, rawEthPrice]);
+    return [{
+      address,
+      collateralType: "BridgedETH",
+      collateralAmount,
+      collateralValueUSD,
+      debtAmount: debtNum,
+      healthFactor,
+    }];
+  }, [address, rawDebt, rawCollateral, rawEthPrice]);
 
   const refetch = useCallback(() => {
     refetchDebt();
     refetchCollateral();
-    refetchDemoDebt();
-    refetchDemoCollateral();
     refetchPrice();
-  }, [refetchDebt, refetchCollateral, refetchDemoDebt, refetchDemoCollateral, refetchPrice]);
+  }, [refetchDebt, refetchCollateral, refetchPrice]);
 
   return { positions, isLoading, isError, refetch };
 }
