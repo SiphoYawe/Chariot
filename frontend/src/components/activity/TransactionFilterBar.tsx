@@ -2,7 +2,7 @@
 
 import type { TransactionType } from "@/types/transaction";
 
-export type FilterOption = "all" | "deposits" | "withdrawals" | "borrows" | "repays" | "liquidations" | "bridge";
+export type FilterOption = "all" | "deposits" | "withdrawals" | "borrows" | "repays" | "liquidations";
 
 const FILTER_OPTIONS: { label: string; value: FilterOption }[] = [
   { label: "All", value: "all" },
@@ -11,7 +11,6 @@ const FILTER_OPTIONS: { label: string; value: FilterOption }[] = [
   { label: "Borrows", value: "borrows" },
   { label: "Repays", value: "repays" },
   { label: "Liquidations", value: "liquidations" },
-  { label: "Bridge", value: "bridge" },
 ];
 
 // Maps filter option to matching transaction types
@@ -22,7 +21,6 @@ export const FILTER_TYPE_MAP: Record<FilterOption, TransactionType[] | null> = {
   borrows: ["borrow"],
   repays: ["repay"],
   liquidations: ["liquidation"],
-  bridge: ["bridge"],
 };
 
 interface TransactionFilterBarProps {

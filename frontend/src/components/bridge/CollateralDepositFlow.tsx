@@ -83,7 +83,7 @@ export function CollateralDepositFlow({
           Deposit ETH Collateral
         </h3>
         <p className="text-xs text-[#6B8A8D] mt-1">
-          Lock ETH on Ethereum Sepolia to bridge as collateral on Arc
+          Lock ETH on Ethereum Sepolia to use as collateral on Arc
         </p>
       </div>
 
@@ -182,7 +182,7 @@ export function CollateralDepositFlow({
 
           {/* Flow explanation */}
           <p className="text-[10px] text-[#6B8A8D] text-center leading-relaxed">
-            Deposit ETH on Ethereum &rarr; Bridge to Arc &rarr; Use as collateral &rarr; Borrow USDC
+            Deposit ETH on Ethereum &rarr; Transferred to Arc &rarr; Use as collateral &rarr; Borrow USDC
           </p>
         </div>
       ) : (

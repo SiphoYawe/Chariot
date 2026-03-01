@@ -174,7 +174,7 @@ export default function BorrowPage() {
           <EmptyState
             icon={IconWallet}
             headline="Deposit ETH to Start Borrowing"
-            description="Lock ETH on Ethereum as collateral, bridge it to Arc, and borrow USDC at competitive rates. Your ETH remains safe in a smart contract escrow."
+            description="Lock ETH on Ethereum as collateral and borrow USDC at competitive rates on Arc. Your ETH remains safe in a smart contract escrow."
             action={{
               label: "Deposit ETH",
               onClick: () => setShowDepositFlow(true),
@@ -215,7 +215,7 @@ export default function BorrowPage() {
                 <div className="space-y-3">
                   {[
                     { step: "1", label: "Lock ETH on Ethereum Sepolia" },
-                    { step: "2", label: "Bridge relayer mints BridgedETH on Arc" },
+                    { step: "2", label: "ETH transferred to Arc as BridgedETH" },
                     { step: "3", label: "BridgedETH deposited as collateral" },
                     { step: "4", label: "Borrow USDC up to 75% LTV" },
                   ].map(({ step, label }) => (

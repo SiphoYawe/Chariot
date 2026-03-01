@@ -4,14 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount, useChainId } from "wagmi";
-import { IconHomeFilled, IconCoinFilled, IconCreditCardFilled, IconArrowsExchange, IconClockFilled } from "@tabler/icons-react";
+import { IconHomeFilled, IconCoinFilled, IconCreditCardFilled, IconClockFilled } from "@tabler/icons-react";
 import { arcTestnet } from "@/lib/chains";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: IconHomeFilled },
   { href: "/lend", label: "Lend", icon: IconCoinFilled },
   { href: "/borrow", label: "Borrow", icon: IconCreditCardFilled },
-  { href: "/bridge", label: "Bridge", icon: IconArrowsExchange },
   { href: "/history", label: "History", icon: IconClockFilled },
 ];
 

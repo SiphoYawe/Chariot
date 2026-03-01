@@ -83,7 +83,6 @@ function NoFilterResults({
     borrows: "borrow",
     repays: "repay",
     liquidations: "liquidation",
-    bridge: "bridge",
   };
 
   return (
