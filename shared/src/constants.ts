@@ -98,7 +98,7 @@ export const AGENT_CONFIG = {
   MAX_REBALANCES_PER_DAY: 3,
 } as const;
 
-// Demo / testnet deployer address -- used as fallback to show a sample
-// borrow position when the connected wallet has no active position.
+// Primary user wallet address -- all seeded protocol positions
+// (collateral, borrows, vault deposits) are attributed to this address.
 export const DEMO_BORROWER_ADDRESS =
-  "0xaEA0FC6B4738704ef6cfAf24D83199cb8FFf61C0" as `0x${string}`;
+  "0xACd311128fFa3A8DC5C3155071BEEC1FB6fE141e" as `0x${string}`;

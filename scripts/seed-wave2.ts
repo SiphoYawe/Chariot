@@ -9,6 +9,9 @@
  *   - Borrow-repay-reborrow patterns
  *   - Vault withdraw + re-deposit
  *   - Partial repayments
+ *
+ * All protocol operations are signed by the USER wallet so events
+ * are attributed to the connected MetaMask address.
  */
 
 import fs from "fs";
@@ -53,6 +56,12 @@ if (!DEPLOYER_KEY) {
   console.error("ERROR: DEPLOYER_PRIVATE_KEY not set in contracts/.env");
   process.exit(1);
 }
+const USER_KEY = env.USER_PRIVATE_KEY as `0x${string}`;
+if (!USER_KEY) {
+  console.error("ERROR: USER_PRIVATE_KEY not set in contracts/.env");
+  console.error("  Add USER_PRIVATE_KEY=0x... (your MetaMask wallet key)");
+  process.exit(1);
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -86,15 +95,22 @@ const arcTestnet = defineChain({
   rpcUrls: { default: { http: [RPC_URL] } },
 });
 
-const account = privateKeyToAccount(DEPLOYER_KEY);
+const deployerAccount = privateKeyToAccount(DEPLOYER_KEY);
+const userAccount = privateKeyToAccount(USER_KEY);
 const transport = http(RPC_URL);
 const publicClient = createPublicClient({ chain: arcTestnet, transport });
-const walletClient = createWalletClient({
-  account,
+const deployerWallet = createWalletClient({
+  account: deployerAccount,
   chain: arcTestnet,
   transport,
 });
-const deployer = account.address;
+const userWallet = createWalletClient({
+  account: userAccount,
+  chain: arcTestnet,
+  transport,
+});
+const deployer = deployerAccount.address;
+const user = userAccount.address;
 
 // ---------------------------------------------------------------------------
 // ABIs
@@ -323,6 +339,7 @@ const POOL_ABI = [
 
 let txCount = 0;
 
+/** Execute a transaction signed by the DEPLOYER (admin ops). */
 async function execTx(
   label: string,
   params: {
@@ -338,13 +355,48 @@ async function execTx(
 
   try {
     const { request } = await publicClient.simulateContract({
-      account,
+      account: deployerAccount,
       address: params.address,
       abi: params.abi,
       functionName: params.functionName,
       args: params.args ?? [],
     } as any);
-    const hash = await walletClient.writeContract(request as any);
+    const hash = await deployerWallet.writeContract(request as any);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    const status = receipt.status === "success" ? "OK" : "REVERTED";
+    console.log(` ${status} (${hash.slice(0, 10)}...)`);
+    return hash;
+  } catch (error: any) {
+    const msg = error.shortMessage || error.message || String(error);
+    console.log(` FAILED`);
+    console.error(`       ${msg.split("\n")[0]}`);
+    throw error;
+  }
+}
+
+/** Execute a transaction signed by the USER (protocol operations). */
+async function execUserTx(
+  label: string,
+  params: {
+    address: Address;
+    abi: readonly unknown[];
+    functionName: string;
+    args?: readonly unknown[];
+  }
+): Promise<Hash> {
+  txCount++;
+  const tag = `[${String(txCount).padStart(2, " ")}]`;
+  process.stdout.write(`  ${tag} [user] ${label}...`);
+
+  try {
+    const { request } = await publicClient.simulateContract({
+      account: userAccount,
+      address: params.address,
+      abi: params.abi,
+      functionName: params.functionName,
+      args: params.args ?? [],
+    } as any);
+    const hash = await userWallet.writeContract(request as any);
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     const status = receipt.status === "success" ? "OK" : "REVERTED";
     console.log(` ${status} (${hash.slice(0, 10)}...)`);
@@ -379,32 +431,32 @@ async function refreshOracle() {
 async function phaseA() {
   banner("Phase A: Varied Vault Deposits");
 
-  await execTx("Approve ChariotVault for $10 USDC", {
+  await execUserTx("Approve ChariotVault for $10 USDC", {
     address: USDC,
     abi: ERC20_ABI,
     functionName: "approve",
     args: [CHARIOT_VAULT, usdc(10)],
   });
 
-  await execTx("Deposit $4.00 USDC into vault", {
+  await execUserTx("Deposit $4.00 USDC into vault", {
     address: CHARIOT_VAULT,
     abi: VAULT_ABI,
     functionName: "deposit",
-    args: [usdc(4), deployer],
+    args: [usdc(4), user],
   });
 
-  await execTx("Deposit $2.50 USDC into vault", {
+  await execUserTx("Deposit $2.50 USDC into vault", {
     address: CHARIOT_VAULT,
     abi: VAULT_ABI,
     functionName: "deposit",
-    args: [usdc(2.5), deployer],
+    args: [usdc(2.5), user],
   });
 
-  await execTx("Deposit $1.75 USDC into vault", {
+  await execUserTx("Deposit $1.75 USDC into vault", {
     address: CHARIOT_VAULT,
     abi: VAULT_ABI,
     functionName: "deposit",
-    args: [usdc(1.75), deployer],
+    args: [usdc(1.75), user],
   });
 }
 
@@ -415,14 +467,14 @@ async function phaseA() {
 async function phaseB() {
   banner("Phase B: Partial Debt Repayment");
 
-  await execTx("Approve LendingPool for $2 USDC repay", {
+  await execUserTx("Approve LendingPool for $2 USDC repay", {
     address: USDC,
     abi: ERC20_ABI,
     functionName: "approve",
     args: [LENDING_POOL, usdc(2)],
   });
 
-  await execTx("Repay $2.00 USDC of debt", {
+  await execUserTx("Repay $2.00 USDC of debt", {
     address: LENDING_POOL,
     abi: POOL_ABI,
     functionName: "repay",
@@ -437,38 +489,38 @@ async function phaseB() {
 async function phaseC() {
   banner("Phase C: Mint BridgedETH + Collateral Operations");
 
-  // Mint realistic ETH amounts (nonces 1001, 1002 -- two separate bridge events)
-  await execTx("Mint 1.5 BridgedETH (nonce=1001)", {
+  // Deployer mints BridgedETH to user (two separate bridge events)
+  await execTx("Mint 1.5 BridgedETH to user (nonce=1001)", {
     address: BRIDGED_ETH,
     abi: BRIDGED_ETH_ABI,
     functionName: "mint",
-    args: [deployer, ethWei(1.5), 1001n],
+    args: [user, ethWei(1.5), 1001n],
   });
 
-  await execTx("Mint 0.8 BridgedETH (nonce=1002)", {
+  await execTx("Mint 0.8 BridgedETH to user (nonce=1002)", {
     address: BRIDGED_ETH,
     abi: BRIDGED_ETH_ABI,
     functionName: "mint",
-    args: [deployer, ethWei(0.8), 1002n],
+    args: [user, ethWei(0.8), 1002n],
   });
 
-  // Approve collateral manager
-  await execTx("Approve CollateralManager for 2.3 BridgedETH", {
+  // User approves collateral manager
+  await execUserTx("Approve CollateralManager for 2.3 BridgedETH", {
     address: BRIDGED_ETH,
     abi: BRIDGED_ETH_ABI,
     functionName: "approve",
     args: [COLLATERAL_MANAGER, ethWei(2.3)],
   });
 
-  // Deposit in two batches for variety
-  await execTx("Deposit 1.2 BridgedETH as collateral", {
+  // User deposits collateral in two batches
+  await execUserTx("Deposit 1.2 BridgedETH as collateral", {
     address: COLLATERAL_MANAGER,
     abi: COLLATERAL_ABI,
     functionName: "depositCollateral",
     args: [BRIDGED_ETH, ethWei(1.2)],
   });
 
-  await execTx("Deposit 0.5 BridgedETH as collateral", {
+  await execUserTx("Deposit 0.5 BridgedETH as collateral", {
     address: COLLATERAL_MANAGER,
     abi: COLLATERAL_ABI,
     functionName: "depositCollateral",
@@ -477,7 +529,7 @@ async function phaseC() {
 }
 
 // ---------------------------------------------------------------------------
-// Phase D: Additional Borrows (more collateral = more borrowing power)
+// Phase D: Additional Borrows
 // ---------------------------------------------------------------------------
 
 async function phaseD() {
@@ -485,8 +537,7 @@ async function phaseD() {
 
   await refreshOracle();
 
-  // Borrow $4 (debt goes from ~$7 to ~$11)
-  await execTx("Borrow $4.00 USDC", {
+  await execUserTx("Borrow $4.00 USDC", {
     address: LENDING_POOL,
     abi: POOL_ABI,
     functionName: "borrow",
@@ -495,8 +546,7 @@ async function phaseD() {
 
   await refreshOracle();
 
-  // Borrow $3 more (debt ~$14)
-  await execTx("Borrow $3.00 USDC", {
+  await execUserTx("Borrow $3.00 USDC", {
     address: LENDING_POOL,
     abi: POOL_ABI,
     functionName: "borrow",
@@ -511,14 +561,14 @@ async function phaseD() {
 async function phaseE() {
   banner("Phase E: Repay-Reborrow Cycle");
 
-  await execTx("Approve LendingPool for $5 USDC repay", {
+  await execUserTx("Approve LendingPool for $5 USDC repay", {
     address: USDC,
     abi: ERC20_ABI,
     functionName: "approve",
     args: [LENDING_POOL, usdc(5)],
   });
 
-  await execTx("Repay $5.00 USDC", {
+  await execUserTx("Repay $5.00 USDC", {
     address: LENDING_POOL,
     abi: POOL_ABI,
     functionName: "repay",
@@ -527,7 +577,7 @@ async function phaseE() {
 
   await refreshOracle();
 
-  await execTx("Re-borrow $3.00 USDC", {
+  await execUserTx("Re-borrow $3.00 USDC", {
     address: LENDING_POOL,
     abi: POOL_ABI,
     functionName: "borrow",
@@ -542,25 +592,25 @@ async function phaseE() {
 async function phaseF() {
   banner("Phase F: Vault Withdraw + Re-deposit");
 
-  await execTx("Withdraw $3.00 USDC from vault", {
+  await execUserTx("Withdraw $3.00 USDC from vault", {
     address: CHARIOT_VAULT,
     abi: VAULT_ABI,
     functionName: "withdraw",
-    args: [usdc(3), deployer, deployer],
+    args: [usdc(3), user, user],
   });
 
-  await execTx("Approve ChariotVault for $5 USDC", {
+  await execUserTx("Approve ChariotVault for $5 USDC", {
     address: USDC,
     abi: ERC20_ABI,
     functionName: "approve",
     args: [CHARIOT_VAULT, usdc(5)],
   });
 
-  await execTx("Deposit $5.00 USDC into vault", {
+  await execUserTx("Deposit $5.00 USDC into vault", {
     address: CHARIOT_VAULT,
     abi: VAULT_ABI,
     functionName: "deposit",
-    args: [usdc(5), deployer],
+    args: [usdc(5), user],
   });
 }
 
@@ -573,8 +623,7 @@ async function phaseG() {
 
   await refreshOracle();
 
-  // Withdraw 0.3 ETH collateral (still plenty healthy with ~1.41 ETH remaining)
-  await execTx("Withdraw 0.3 BridgedETH collateral", {
+  await execUserTx("Withdraw 0.3 BridgedETH collateral", {
     address: COLLATERAL_MANAGER,
     abi: COLLATERAL_ABI,
     functionName: "withdrawCollateral",
@@ -591,21 +640,21 @@ async function phaseH() {
 
   await refreshOracle();
 
-  await execTx("Borrow $2.00 USDC", {
+  await execUserTx("Borrow $2.00 USDC", {
     address: LENDING_POOL,
     abi: POOL_ABI,
     functionName: "borrow",
     args: [BRIDGED_ETH, usdc(2), []],
   });
 
-  await execTx("Approve LendingPool for $1.50 USDC", {
+  await execUserTx("Approve LendingPool for $1.50 USDC", {
     address: USDC,
     abi: ERC20_ABI,
     functionName: "approve",
     args: [LENDING_POOL, usdc(1.5)],
   });
 
-  await execTx("Repay $1.50 USDC immediately", {
+  await execUserTx("Repay $1.50 USDC immediately", {
     address: LENDING_POOL,
     abi: POOL_ABI,
     functionName: "repay",
@@ -620,25 +669,25 @@ async function phaseH() {
 async function phaseI() {
   banner("Phase I: Final Varied Deposits");
 
-  await execTx("Approve ChariotVault for $4 USDC", {
+  await execUserTx("Approve ChariotVault for $4 USDC", {
     address: USDC,
     abi: ERC20_ABI,
     functionName: "approve",
     args: [CHARIOT_VAULT, usdc(4)],
   });
 
-  await execTx("Deposit $1.25 USDC into vault", {
+  await execUserTx("Deposit $1.25 USDC into vault", {
     address: CHARIOT_VAULT,
     abi: VAULT_ABI,
     functionName: "deposit",
-    args: [usdc(1.25), deployer],
+    args: [usdc(1.25), user],
   });
 
-  await execTx("Deposit $2.75 USDC into vault", {
+  await execUserTx("Deposit $2.75 USDC into vault", {
     address: CHARIOT_VAULT,
     abi: VAULT_ABI,
     functionName: "deposit",
-    args: [usdc(2.75), deployer],
+    args: [usdc(2.75), user],
   });
 }
 
@@ -658,12 +707,12 @@ async function phaseJ() {
     totalLent,
     totalSupply,
     totalBorrowed,
-    deployerDebt,
-    deployerCollateral,
+    userDebt,
+    userCollateral,
     ethPrice,
     collateralValue,
-    deployerUSDC,
-    deployerShares,
+    userUSDC,
+    userShares,
   ] = await Promise.all([
     publicClient.readContract({
       address: CHARIOT_VAULT,
@@ -689,13 +738,13 @@ async function phaseJ() {
       address: LENDING_POOL,
       abi: POOL_ABI,
       functionName: "getUserDebt",
-      args: [deployer],
+      args: [user],
     }),
     publicClient.readContract({
       address: COLLATERAL_MANAGER,
       abi: COLLATERAL_ABI,
       functionName: "getCollateralBalance",
-      args: [deployer, BRIDGED_ETH],
+      args: [user, BRIDGED_ETH],
     }),
     publicClient.readContract({
       address: COLLATERAL_MANAGER,
@@ -706,19 +755,19 @@ async function phaseJ() {
       address: COLLATERAL_MANAGER,
       abi: COLLATERAL_ABI,
       functionName: "getCollateralValueView",
-      args: [deployer],
+      args: [user],
     }),
     publicClient.readContract({
       address: USDC,
       abi: ERC20_ABI,
       functionName: "balanceOf",
-      args: [deployer],
+      args: [user],
     }),
     publicClient.readContract({
       address: CHARIOT_VAULT,
       abi: VAULT_ABI,
       functionName: "balanceOf",
-      args: [deployer],
+      args: [user],
     }),
   ]);
 
@@ -726,7 +775,7 @@ async function phaseJ() {
   const borrowed = Number(formatUnits(totalBorrowed, 6));
   const util = tvl > 0 ? ((borrowed / tvl) * 100).toFixed(2) : "0.00";
   const collVal = Number(formatUnits(collateralValue, 6));
-  const debt = Number(formatUnits(deployerDebt, 6));
+  const debt = Number(formatUnits(userDebt, 6));
   const hf = debt > 0 ? ((collVal * 0.82) / debt).toFixed(2) : "Inf";
 
   console.log(
@@ -757,10 +806,10 @@ async function phaseJ() {
     "  +---------------------------------------------+"
   );
   console.log(
-    `  |  Deployer Debt           $${formatUnits(deployerDebt, 6).padStart(14)} |`
+    `  |  User Debt               $${formatUnits(userDebt, 6).padStart(14)} |`
   );
   console.log(
-    `  |  Deployer Collateral      ${formatUnits(deployerCollateral, 18).padStart(12)} ETH |`
+    `  |  User Collateral          ${formatUnits(userCollateral, 18).padStart(12)} ETH |`
   );
   console.log(
     `  |  Collateral Value        $${formatUnits(collateralValue, 6).padStart(14)} |`
@@ -769,10 +818,10 @@ async function phaseJ() {
     `  |  Health Factor            ${hf.padStart(14)} |`
   );
   console.log(
-    `  |  Deployer USDC           $${formatUnits(deployerUSDC, 6).padStart(14)} |`
+    `  |  User USDC              $${formatUnits(userUSDC, 6).padStart(14)} |`
   );
   console.log(
-    `  |  Deployer chUSDC          ${formatUnits(deployerShares, 6).padStart(14)} |`
+    `  |  User chUSDC             ${formatUnits(userShares, 6).padStart(14)} |`
   );
   console.log(
     "  +---------------------------------------------+"
@@ -788,19 +837,20 @@ async function main() {
   console.log("\n  Chariot Protocol -- Seed Wave 2");
   console.log("  ================================");
   console.log(`  Deployer: ${deployer}`);
+  console.log(`  User:     ${user}`);
   console.log(`  RPC:      ${RPC_URL}`);
 
   try {
     await phaseA(); // 4 tx: approve + 3 deposits
     await phaseB(); // 2 tx: approve + repay
-    await phaseC(); // 5 tx: 2 mints + approve + 2 collateral deposits
-    await phaseD(); // 4 tx: oracle + borrow + oracle + borrow
-    await phaseE(); // 4 tx: approve + repay + oracle + borrow
-    await phaseF(); // 3 tx: withdraw + approve + deposit
-    await phaseG(); // 2 tx: oracle + collateral withdrawal
-    await phaseH(); // 4 tx: oracle + borrow + approve + repay
-    await phaseI(); // 3 tx: approve + 2 deposits
-    await phaseJ(); // 1 tx: oracle + read state
+    await phaseC(); // 5 tx: 2 mints (deployer) + approve + 2 collateral deposits (user)
+    await phaseD(); // 4 tx: oracle (deployer) + borrow (user) + oracle + borrow
+    await phaseE(); // 4 tx: approve + repay (user) + oracle (deployer) + borrow (user)
+    await phaseF(); // 3 tx: withdraw + approve + deposit (all user)
+    await phaseG(); // 2 tx: oracle (deployer) + collateral withdrawal (user)
+    await phaseH(); // 4 tx: oracle (deployer) + borrow + approve + repay (user)
+    await phaseI(); // 3 tx: approve + 2 deposits (user)
+    await phaseJ(); // 1 tx: oracle (deployer) + read state
 
     banner("Wave 2 Seeding Complete!");
     console.log(
