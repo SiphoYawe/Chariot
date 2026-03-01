@@ -20,19 +20,68 @@ Arc serves as the central clearing hub -- all lending, borrowing, and liquidatio
 
 ## Core Features
 
-**Dual-Yield Vault** -- The ChariotVault implements ERC-4626 and splits deposited USDC between a lending pool (earning borrower interest) and a USYC strategy (earning ~4.5% APY from tokenized T-bills). The vault actively rebalances between the two, maintaining a 5% liquid USDC buffer. At low utilisation, lenders still earn near-T-bill rates instead of the near-zero yields typical of Aave-style protocols. (USYC integration pending whitelisting by Circle/Hashnote.)
+### Dual-Yield Vault
 
-**Dynamic Interest Rates** -- Borrow rates follow an Aave V3-style kinked utilisation curve. Below 80% utilisation, rates rise gently (4% slope). Above 80%, rates spike aggressively (75% slope) to incentivize repayment. A volatility premium is added on top -- `kVol * max(0, currentVol - baselineVol)` -- which charges higher rates when collateral volatility exceeds the baseline, gracefully degrading to zero when volatility feeds are not configured.
+ERC-4626 vault that splits deposited USDC between borrower lending and tokenized T-bills (USYC) for two simultaneous yield sources.
 
-**Volatility-Adjusted Risk Parameters** -- LTV ratios and liquidation thresholds adjust based on oracle volatility data. When ETH volatility spikes, LTV tightens automatically (`effectiveLTV = baseLTV - K_LTV * excessVol`). The liquidation threshold follows at a fixed 7% buffer above effective LTV. Currently static at 82% (base LTV 75% + 7% buffer) since live volatility feeds are not active on testnet -- falls back to static base LTV when feeds are unavailable.
+- Actively rebalances between lending pool and USYC strategy (~4.5% APY)
+- Maintains a 5% liquid USDC buffer at all times
+- At low utilisation, lenders still earn near-T-bill rates instead of near-zero yields
+- USYC integration pending whitelisting by Circle/Hashnote
 
-**ETH Collateral** -- Borrowers deposit ETH on Ethereum Sepolia, which is locked in the ETHEscrow contract. A relayer mints BridgedETH (ERC-20) on Arc, which is automatically deposited as collateral. Nonce-based replay protection prevents double-minting, with 24-hour timeout refunds as a safety net.
+### Dynamic Interest Rates
 
-**Liquidation Engine** -- Positions with a health factor below 1.0 can be liquidated. Liquidators repay up to 50% of a borrower's debt and seize collateral with a bonus that scales from 5% to 10% based on how far underwater the position is.
+Aave V3-style kinked utilisation curve with a volatility premium layer.
 
-**Circuit Breakers** -- Three-level protection system. ChariotBase provides manual trigger via operator, and the standalone CircuitBreaker contract adds automatic escalation/de-escalation. Level 1 pauses new borrows on >15% collateral drops. Level 2 rate-limits withdrawals on >20% pool outflows. Level 3 triggers emergency mode on sustained >95% utilisation or stale oracles, requiring admin intervention to resume. External callers feed metrics via `recordCollateralValue()`, `recordWithdrawal()`, `recordUtilisation()`, and `recordOracleTimestamp()`.
+- **Below 80% utilisation:** rates rise gently (4% slope)
+- **Above 80% utilisation:** rates spike aggressively (75% slope) to incentivize repayment
+- Volatility premium: `kVol * max(0, currentVol - baselineVol)`
+- Degrades gracefully to zero when volatility feeds are not configured
 
-**Vault Management Agent** -- An autonomous Node.js agent manages the USYC rebalancing strategy using a Circle developer-controlled wallet (EOA via Circle Programmable Wallets). Runs a 60-second monitoring loop, evaluates rebalance opportunities with a utility-based decision engine, and executes `ChariotVault.rebalance()`. Rate-limited to 3 rebalances per day. On circuit breaker Level 3, it triggers emergency full USYC redemption.
+### Volatility-Adjusted Risk Parameters
+
+LTV ratios and liquidation thresholds adjust dynamically based on oracle volatility data.
+
+- Formula: `effectiveLTV = baseLTV - K_LTV * excessVol`
+- Liquidation threshold sits at a fixed 7% buffer above effective LTV
+- Currently static at 82% (base LTV 75% + 7% buffer) -- live volatility feeds not active on testnet
+- Falls back to static base LTV when feeds are unavailable
+
+### ETH Collateral Bridge
+
+Borrowers deposit ETH on Ethereum Sepolia, which is bridged to Arc as BridgedETH (ERC-20) collateral.
+
+- ETH locked in ETHEscrow contract on Sepolia
+- Relayer mints BridgedETH on Arc and auto-deposits as collateral
+- Nonce-based replay protection prevents double-minting
+- 24-hour timeout refunds as a safety net
+
+### Liquidation Engine
+
+Positions with a health factor below 1.0 can be liquidated by any caller.
+
+- Liquidators repay up to 50% of a borrower's debt per liquidation
+- Collateral seizure bonus scales from 5% to 10% based on how far underwater the position is
+
+### Circuit Breakers
+
+Three-level protection system with automatic escalation and de-escalation.
+
+| Level | Trigger | Action |
+|-------|---------|--------|
+| 1 | >15% collateral value drop | Pauses new borrows |
+| 2 | >20% pool outflows | Rate-limits withdrawals |
+| 3 | Sustained >95% utilisation or stale oracles | Emergency mode -- requires admin intervention |
+
+External callers feed metrics via `recordCollateralValue()`, `recordWithdrawal()`, `recordUtilisation()`, and `recordOracleTimestamp()`.
+
+### Vault Management Agent
+
+Autonomous Node.js agent managing the USYC rebalancing strategy via a Circle developer-controlled wallet.
+
+- 60-second monitoring loop with utility-based decision engine
+- Executes `ChariotVault.rebalance()`, rate-limited to 3 per day
+- Triggers emergency full USYC redemption on circuit breaker Level 3
 
 ## Smart Contract Architecture
 
