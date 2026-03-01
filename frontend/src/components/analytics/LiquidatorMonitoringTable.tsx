@@ -117,10 +117,10 @@ export function LiquidatorMonitoringTable() {
     return (
       <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
         <h3 className="text-sm font-semibold text-[#023436] font-[family-name:var(--font-heading)] mb-4">
-          Borrower Positions
+          Your Position
         </h3>
         <p className="text-sm text-[#6B8A8D] text-center py-8">
-          No active borrower positions
+          No active position
         </p>
       </div>
     );
@@ -130,10 +130,10 @@ export function LiquidatorMonitoringTable() {
     <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-[#023436] font-[family-name:var(--font-heading)]">
-          Borrower Positions
+          Your Position
         </h3>
         <span className="text-xs text-[#6B8A8D]">
-          Sorted by health factor (lowest first)
+          Health factor status
         </span>
       </div>
 

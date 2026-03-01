@@ -73,10 +73,10 @@ export function TopBorrowersList() {
     return (
       <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
         <h3 className="text-sm font-semibold text-[#023436] font-[family-name:var(--font-heading)] mb-4">
-          Top Positions by Collateral
+          Your Collateral Position
         </h3>
         <p className="text-sm text-[#6B8A8D] text-center py-8">
-          No positions to display
+          No position to display
         </p>
       </div>
     );
@@ -85,7 +85,7 @@ export function TopBorrowersList() {
   return (
     <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
       <h3 className="text-sm font-semibold text-[#023436] font-[family-name:var(--font-heading)] mb-4">
-        Top Positions by Collateral
+        Your Collateral Position
       </h3>
 
       <ResponsiveContainer width="100%" height={topBorrowers.length * 36 + 20}>

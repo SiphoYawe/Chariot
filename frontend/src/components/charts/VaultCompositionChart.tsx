@@ -14,7 +14,7 @@ import { useVaultComposition } from "@/hooks/useVaultComposition";
 const SEGMENTS = [
   { key: "idle", label: "Idle in Pool", color: "#037971" },
   { key: "lent", label: "Lent Out", color: "#F59E0B" },
-  { key: "usyc", label: "In T-Bills (USYC)", color: "#10B981" },
+  { key: "usyc", label: "T-Bills (USYC) -- Pending Whitelisting", color: "#10B981" },
 ] as const;
 
 function formatUSDC(value: number): string {
