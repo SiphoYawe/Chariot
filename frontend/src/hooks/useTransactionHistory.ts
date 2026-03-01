@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { decodeEventLog } from "viem";
-import { useAccount } from "wagmi";
 import {
   ChariotVaultABI,
   LendingPoolABI,
@@ -88,61 +87,21 @@ function decodeLogs(
 }
 
 /**
- * Check whether a decoded event involves the given wallet address.
- * Address comparison is case-insensitive.
- */
-function eventInvolvesWallet(event: DecodedEvent, wallet: string): boolean {
-  const w = wallet.toLowerCase();
-  const a = event.args;
-
-  switch (event.eventName) {
-    case "Deposit":
-      return (
-        (a.sender as string)?.toLowerCase() === w ||
-        (a.owner as string)?.toLowerCase() === w
-      );
-    case "Withdraw":
-      return (
-        (a.sender as string)?.toLowerCase() === w ||
-        (a.receiver as string)?.toLowerCase() === w ||
-        (a.owner as string)?.toLowerCase() === w
-      );
-    case "Borrowed":
-    case "Repaid":
-      return (a.borrower as string)?.toLowerCase() === w;
-    case "CollateralDeposited":
-    case "CollateralWithdrawn":
-      return (a.user as string)?.toLowerCase() === w;
-    default:
-      return false;
-  }
-}
-
-/**
  * Hook for fetching real on-chain transaction history via the ArcScan
  * Blockscout API. Fetches event logs from ChariotVault, LendingPool,
  * and CollateralManager, decodes them using the contract ABIs, and
- * returns only events involving the connected wallet.
+ * returns all protocol events.
  *
  * Uses the Blockscout Etherscan-compatible API instead of direct RPC
  * eth_getLogs because the Arc Testnet RPC doesn't reliably support
  * log queries.
  */
 export function useTransactionHistory() {
-  const { address } = useAccount();
   const [data, setData] = useState<Transaction[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
 
   const fetchEvents = useCallback(async () => {
-    // No wallet connected -- return empty immediately
-    if (!address) {
-      setData([]);
-      setIsLoading(false);
-      setIsError(false);
-      return;
-    }
-
     try {
       setIsLoading(true);
 
@@ -188,9 +147,9 @@ export function useTransactionHistory() {
 
       const transactions: Transaction[] = [];
 
-      // Vault deposits -- filtered to connected wallet
+      // Vault deposits
       for (const e of vaultEvents) {
-        if (e.eventName === "Deposit" && eventInvolvesWallet(e, address)) {
+        if (e.eventName === "Deposit") {
           transactions.push({
             id: `${e.transactionHash}-deposit`,
             type: "deposit",
@@ -206,7 +165,7 @@ export function useTransactionHistory() {
 
       // Vault withdrawals
       for (const e of vaultEvents) {
-        if (e.eventName === "Withdraw" && eventInvolvesWallet(e, address)) {
+        if (e.eventName === "Withdraw") {
           transactions.push({
             id: `${e.transactionHash}-withdraw`,
             type: "withdrawal",
@@ -222,7 +181,7 @@ export function useTransactionHistory() {
 
       // Borrows
       for (const e of poolEvents) {
-        if (e.eventName === "Borrowed" && eventInvolvesWallet(e, address)) {
+        if (e.eventName === "Borrowed") {
           transactions.push({
             id: `${e.transactionHash}-borrow`,
             type: "borrow",
@@ -238,7 +197,7 @@ export function useTransactionHistory() {
 
       // Repayments
       for (const e of poolEvents) {
-        if (e.eventName === "Repaid" && eventInvolvesWallet(e, address)) {
+        if (e.eventName === "Repaid") {
           transactions.push({
             id: `${e.transactionHash}-repay`,
             type: "repay",
@@ -254,7 +213,7 @@ export function useTransactionHistory() {
 
       // Collateral deposits
       for (const e of collateralEvents) {
-        if (e.eventName === "CollateralDeposited" && eventInvolvesWallet(e, address)) {
+        if (e.eventName === "CollateralDeposited") {
           transactions.push({
             id: `${e.transactionHash}-collateral_deposit`,
             type: "collateral_deposit",
@@ -270,7 +229,7 @@ export function useTransactionHistory() {
 
       // Collateral withdrawals
       for (const e of collateralEvents) {
-        if (e.eventName === "CollateralWithdrawn" && eventInvolvesWallet(e, address)) {
+        if (e.eventName === "CollateralWithdrawn") {
           transactions.push({
             id: `${e.transactionHash}-collateral_withdrawal`,
             type: "collateral_withdrawal",
@@ -294,7 +253,7 @@ export function useTransactionHistory() {
       setIsError(true);
       setIsLoading(false);
     }
-  }, [address]);
+  }, []);
 
   useEffect(() => {
     fetchEvents();
