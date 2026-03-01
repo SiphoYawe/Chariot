@@ -490,18 +490,18 @@ async function phaseC() {
   banner("Phase C: Mint BridgedETH + Collateral Operations");
 
   // Deployer mints BridgedETH to user (two separate bridge events)
-  await execTx("Mint 1.5 BridgedETH to user (nonce=1001)", {
+  await execTx("Mint 1.5 BridgedETH to user (nonce=2001)", {
     address: BRIDGED_ETH,
     abi: BRIDGED_ETH_ABI,
     functionName: "mint",
-    args: [user, ethWei(1.5), 1001n],
+    args: [user, ethWei(1.5), 2001n],
   });
 
-  await execTx("Mint 0.8 BridgedETH to user (nonce=1002)", {
+  await execTx("Mint 0.8 BridgedETH to user (nonce=2002)", {
     address: BRIDGED_ETH,
     abi: BRIDGED_ETH_ABI,
     functionName: "mint",
-    args: [user, ethWei(0.8), 1002n],
+    args: [user, ethWei(0.8), 2002n],
   });
 
   // User approves collateral manager
@@ -621,13 +621,27 @@ async function phaseF() {
 async function phaseG() {
   banner("Phase G: Partial Collateral Withdrawal");
 
+  // CollateralManager.withdrawCollateral reverts with DebtOutstanding()
+  // when the user has any active debt. Check first and skip if so.
+  const debt = await publicClient.readContract({
+    address: LENDING_POOL,
+    abi: POOL_ABI,
+    functionName: "getUserDebt",
+    args: [user],
+  });
+
+  if ((debt as bigint) > 0n) {
+    console.log(`  -- User has $${Number(debt as bigint) / 1e6} outstanding debt, skipping collateral withdrawal`);
+    return;
+  }
+
   await refreshOracle();
 
-  await execUserTx("Withdraw 0.3 BridgedETH collateral", {
+  await execUserTx("Withdraw 0.1 BridgedETH collateral", {
     address: COLLATERAL_MANAGER,
     abi: COLLATERAL_ABI,
     functionName: "withdrawCollateral",
-    args: [BRIDGED_ETH, ethWei(0.3)],
+    args: [BRIDGED_ETH, ethWei(0.1)],
   });
 }
 
@@ -840,17 +854,31 @@ async function main() {
   console.log(`  User:     ${user}`);
   console.log(`  RPC:      ${RPC_URL}`);
 
+  // Set START_PHASE env to skip already-completed phases on re-run.
+  // e.g. START_PHASE=G npx tsx scripts/seed-wave2.ts
+  const startPhase = (process.env.START_PHASE || "A").toUpperCase();
+  const phases = [
+    { id: "A", fn: phaseA, desc: "4 tx: approve + 3 deposits" },
+    { id: "B", fn: phaseB, desc: "2 tx: approve + repay" },
+    { id: "C", fn: phaseC, desc: "5 tx: 2 mints (deployer) + approve + 2 collateral deposits (user)" },
+    { id: "D", fn: phaseD, desc: "4 tx: oracle (deployer) + borrow (user) + oracle + borrow" },
+    { id: "E", fn: phaseE, desc: "4 tx: approve + repay (user) + oracle (deployer) + borrow (user)" },
+    { id: "F", fn: phaseF, desc: "3 tx: withdraw + approve + deposit (all user)" },
+    { id: "G", fn: phaseG, desc: "2 tx: oracle (deployer) + collateral withdrawal (user)" },
+    { id: "H", fn: phaseH, desc: "4 tx: oracle (deployer) + borrow + approve + repay (user)" },
+    { id: "I", fn: phaseI, desc: "3 tx: approve + 2 deposits (user)" },
+    { id: "J", fn: phaseJ, desc: "1 tx: oracle (deployer) + read state" },
+  ];
+
+  const startIdx = phases.findIndex((p) => p.id === startPhase);
+  if (startIdx > 0) {
+    console.log(`\n  Skipping phases A-${phases[startIdx - 1].id} (START_PHASE=${startPhase})`);
+  }
+
   try {
-    await phaseA(); // 4 tx: approve + 3 deposits
-    await phaseB(); // 2 tx: approve + repay
-    await phaseC(); // 5 tx: 2 mints (deployer) + approve + 2 collateral deposits (user)
-    await phaseD(); // 4 tx: oracle (deployer) + borrow (user) + oracle + borrow
-    await phaseE(); // 4 tx: approve + repay (user) + oracle (deployer) + borrow (user)
-    await phaseF(); // 3 tx: withdraw + approve + deposit (all user)
-    await phaseG(); // 2 tx: oracle (deployer) + collateral withdrawal (user)
-    await phaseH(); // 4 tx: oracle (deployer) + borrow + approve + repay (user)
-    await phaseI(); // 3 tx: approve + 2 deposits (user)
-    await phaseJ(); // 1 tx: oracle (deployer) + read state
+    for (const phase of phases.slice(startIdx)) {
+      await phase.fn();
+    }
 
     banner("Wave 2 Seeding Complete!");
     console.log(

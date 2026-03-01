@@ -513,60 +513,76 @@ async function phase1_adminSetup() {
 async function phase2_lenderDeposits() {
   banner("Phase 2: Fund User + Lender Deposits (~$31 into vault)");
 
-  // Check deployer USDC balance
+  // Check both balances to determine funding strategy
+  const [userBal, deployerBal] = await Promise.all([
+    publicClient.readContract({ address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [user] }),
+    publicClient.readContract({ address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [deployer] }),
+  ]);
+  console.log(`  User USDC balance:     $${formatUnits(userBal, 6)}`);
+  console.log(`  Deployer USDC balance: $${formatUnits(deployerBal, 6)}`);
+
+  // Total needed for vault deposits ($31) + repay buffer ($10) = $41
+  // On Arc Testnet, USDC is also the native gas token, so we must leave
+  // a gas buffer (~$1) when transferring from deployer.
+  const needed = usdc(41);
+  const GAS_BUFFER = usdc(1);
+  if (userBal < needed && deployerBal > GAS_BUFFER + usdc(5)) {
+    // Transfer what deployer can spare (balance minus gas buffer, capped at $40)
+    const spendable = deployerBal - GAS_BUFFER;
+    const transferAmt = spendable < usdc(40) ? spendable : usdc(40);
+    console.log(`  Transferring $${formatUnits(transferAmt, 6)} USDC to user`);
+    await execTx(`Transfer $${formatUnits(transferAmt, 6)} USDC to user wallet`, {
+      address: USDC,
+      abi: ERC20_ABI,
+      functionName: "transfer",
+      args: [user, transferAmt],
+    });
+  } else if (userBal >= needed) {
+    console.log(`  -- User already has sufficient USDC, skipping transfer`);
+  } else {
+    console.log(`  -- Deployer low on USDC ($${formatUnits(deployerBal, 6)}), proceeding with user's balance`);
+  }
+
+  // Re-read user balance after potential transfer
   const balance = await publicClient.readContract({
-    address: USDC,
-    abi: ERC20_ABI,
-    functionName: "balanceOf",
-    args: [deployer],
+    address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [user],
   });
-  console.log(`  Deployer USDC balance: $${formatUnits(balance, 6)}`);
+  console.log(`  User USDC balance after funding: $${formatUnits(balance, 6)}`);
 
-  // Transfer $40 USDC to user (covers vault deposits + repays later)
-  await execTx("Transfer $40 USDC to user wallet", {
-    address: USDC,
-    abi: ERC20_ABI,
-    functionName: "transfer",
-    args: [user, usdc(40)],
-  });
+  // Determine deposit amounts based on available balance
+  // Reserve $10 for repay operations in Phase 4
+  const availableForDeposits = balance > usdc(10) ? balance - usdc(10) : 0n;
 
-  // User approves vault for $35
-  await execUserTx("Approve ChariotVault for $35 USDC", {
+  if (availableForDeposits < usdc(3)) {
+    console.log(`  -- Insufficient USDC for vault deposits ($${formatUnits(availableForDeposits, 6)} available). Skipping.`);
+    return;
+  }
+
+  // Scale deposits proportionally to available balance (target: $12, $9, $7, $3 = $31)
+  const depositAmounts = [usdc(12), usdc(9), usdc(7), usdc(3)];
+  const totalTarget = usdc(31);
+  const scaledAmounts = availableForDeposits >= totalTarget
+    ? depositAmounts
+    : depositAmounts.map(a => (a * availableForDeposits) / totalTarget);
+
+  const totalApproval = scaledAmounts.reduce((a, b) => a + b, 0n);
+
+  await execUserTx(`Approve ChariotVault for $${formatUnits(totalApproval, 6)} USDC`, {
     address: USDC,
     abi: ERC20_ABI,
     functionName: "approve",
-    args: [CHARIOT_VAULT, usdc(35)],
+    args: [CHARIOT_VAULT, totalApproval],
   });
 
-  // User makes three separate deposits
-  await execUserTx("Deposit $12 USDC into vault", {
-    address: CHARIOT_VAULT,
-    abi: VAULT_ABI,
-    functionName: "deposit",
-    args: [usdc(12), user],
-  });
-
-  await execUserTx("Deposit $9 USDC into vault", {
-    address: CHARIOT_VAULT,
-    abi: VAULT_ABI,
-    functionName: "deposit",
-    args: [usdc(9), user],
-  });
-
-  await execUserTx("Deposit $7 USDC into vault", {
-    address: CHARIOT_VAULT,
-    abi: VAULT_ABI,
-    functionName: "deposit",
-    args: [usdc(7), user],
-  });
-
-  // One more deposit for variety
-  await execUserTx("Deposit $3 USDC into vault", {
-    address: CHARIOT_VAULT,
-    abi: VAULT_ABI,
-    functionName: "deposit",
-    args: [usdc(3), user],
-  });
+  for (const amount of scaledAmounts) {
+    if (amount < usdc(1)) continue; // skip dust amounts
+    await execUserTx(`Deposit $${formatUnits(amount, 6)} USDC into vault`, {
+      address: CHARIOT_VAULT,
+      abi: VAULT_ABI,
+      functionName: "deposit",
+      args: [amount, user],
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -576,13 +592,13 @@ async function phase2_lenderDeposits() {
 async function phase3_borrowerOps() {
   banner("Phase 3: Borrower Operations (ETH collateral + USDC borrows)");
 
-  // Deployer mints 0.01 BridgedETH to user (nonce=1000 avoids bridge collision)
+  // Deployer mints 0.01 BridgedETH to user (nonce=2000 avoids previous seed collision)
   // 0.01 ETH * $2,500 = $25 collateral value
-  await execTx("Mint 0.01 BridgedETH to user (nonce=1000)", {
+  await execTx("Mint 0.01 BridgedETH to user (nonce=2000)", {
     address: BRIDGED_ETH,
     abi: BRIDGED_ETH_ABI,
     functionName: "mint",
-    args: [user, 10n ** 16n, 1000n], // 0.01 ETH
+    args: [user, 10n ** 16n, 2000n], // 0.01 ETH
   });
 
   // User approves CollateralManager for 0.01 BridgedETH
