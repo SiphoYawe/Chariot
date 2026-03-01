@@ -74,7 +74,7 @@ export function UtilisationCurveChart() {
 
   const curveData = useMemo(() => {
     const points = [];
-    for (let u = 0; u <= 100; u += 2) {
+    for (let u = 0; u <= 100; u += 1) {
       const borrowRate = calculateBorrowRate(u);
       const supplyAPY = calculateSupplyAPY(u, borrowRate);
       points.push({ utilisation: u, borrowRate, supplyAPY });
@@ -85,7 +85,7 @@ export function UtilisationCurveChart() {
   const { currentBorrowRate, currentSupplyAPY, snappedX } = useMemo(() => {
     const br = calculateBorrowRate(currentUtilisation);
     const sa = calculateSupplyAPY(currentUtilisation, br);
-    const sx = Math.round(currentUtilisation / 2) * 2;
+    const sx = Math.round(currentUtilisation);
     return { currentBorrowRate: br, currentSupplyAPY: sa, snappedX: sx };
   }, [currentUtilisation]);
 
@@ -160,7 +160,7 @@ export function UtilisationCurveChart() {
             }}
           />
           <Line
-            type="monotone"
+            type="linear"
             dataKey="borrowRate"
             name="Borrow Rate"
             stroke="#DC2626"
@@ -169,7 +169,7 @@ export function UtilisationCurveChart() {
             animationDuration={500}
           />
           <Line
-            type="monotone"
+            type="linear"
             dataKey="supplyAPY"
             name="Supply APY"
             stroke="#10B981"

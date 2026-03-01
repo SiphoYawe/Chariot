@@ -2,8 +2,8 @@
 
 import { useState, useCallback } from "react";
 import {
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -41,7 +41,7 @@ function formatTimestampLabel(label: string | number): string {
   return String(label);
 }
 
-function getBarColor(utilisation: number): string {
+function getUtilisationColor(utilisation: number): string {
   if (utilisation < 50) return "#10B981"; // green
   if (utilisation < 80) return "#03B5AA"; // teal
   if (utilisation < 95) return "#F59E0B"; // amber
@@ -67,8 +67,8 @@ function UtilisationTooltip({ active, payload }: UtilisationTooltipProps) {
       </p>
       <div className="flex items-center gap-2">
         <span
-          className="w-2 h-2 shrink-0"
-          style={{ backgroundColor: getBarColor(util) }}
+          className="w-2 h-2 shrink-0 rounded-full"
+          style={{ backgroundColor: getUtilisationColor(util) }}
         />
         <span className="text-xs text-[#6B8A8D]">Utilisation</span>
         <span className="text-sm font-semibold tabular-nums font-[family-name:var(--font-heading)] text-[#023436] ml-auto">
@@ -77,19 +77,6 @@ function UtilisationTooltip({ active, payload }: UtilisationTooltipProps) {
       </div>
     </div>
   );
-}
-
-// Custom bar shape with dynamic color
-interface BarShapeProps {
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  utilisation?: number;
-}
-
-function ColoredBar({ x = 0, y = 0, width = 0, height = 0, utilisation = 0 }: BarShapeProps) {
-  return <rect x={x} y={y} width={width} height={height} fill={getBarColor(utilisation)} />;
 }
 
 export function UtilisationHistoryChart() {
@@ -158,7 +145,13 @@ export function UtilisationHistoryChart() {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id="utilisationGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#03B5AA" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#03B5AA" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="rgba(3,121,113,0.08)"
@@ -166,6 +159,9 @@ export function UtilisationHistoryChart() {
             />
             <XAxis
               dataKey="timestamp"
+              type="number"
+              domain={["dataMin", "dataMax"]}
+              scale="time"
               tickFormatter={formatXTick}
               tick={{ fontSize: 10, fill: "#6B8A8D" }}
               axisLine={false}
@@ -192,13 +188,17 @@ export function UtilisationHistoryChart() {
                 fontSize: 10,
               }}
             />
-            <Bar
+            <Area
+              type="linear"
               dataKey="utilisation"
               name="Utilisation"
-              shape={<ColoredBar />}
+              stroke="#03B5AA"
+              strokeWidth={2}
+              fill="url(#utilisationGradient)"
+              dot={false}
               animationDuration={500}
             />
-          </BarChart>
+          </AreaChart>
         </ResponsiveContainer>
       )}
     </div>
