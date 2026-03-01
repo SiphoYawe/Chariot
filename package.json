@@ -8,6 +8,8 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "test": "turbo test",
+    "test:ui": "pnpm --filter @chariot/e2e-ui test",
+    "test:ui:verbose": "pnpm --filter @chariot/e2e-ui test:verbose",
     "clean": "turbo clean"
   },
   "devDependencies": {

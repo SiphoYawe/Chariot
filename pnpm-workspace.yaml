@@ -5,3 +5,4 @@ packages:
   - "agent"
   - "relayer"
   - "e2e"
+  - "e2e-ui"

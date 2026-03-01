@@ -15,6 +15,10 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "test:ui": {
+      "cache": false,
+      "dependsOn": ["frontend#build"]
+    },
     "clean": {
       "cache": false
     }
