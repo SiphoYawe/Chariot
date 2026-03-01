@@ -3,12 +3,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useVaultMetrics } from "./useVaultMetrics";
 import { type TimePeriod, PERIOD_CUTOFFS, MIN_SNAPSHOT_INTERVAL_MS } from "@/types/charts";
-import {
-  generateSeedData,
-  MIN_SNAPSHOTS_FOR_CHART,
-  SEED_SPANS,
-  SEED_COUNTS,
-} from "@/lib/chartSeed";
 
 export type { TimePeriod };
 
@@ -59,21 +53,6 @@ function filterByPeriod(data: UtilisationDataPoint[], period: TimePeriod): Utili
   return data.filter((d) => d.timestamp >= cutoff);
 }
 
-function buildSeed(currentUtil: number, period: TimePeriod): UtilisationDataPoint[] {
-  const seed = generateSeedData({
-    count: SEED_COUNTS[period] ?? 28,
-    spanMs: SEED_SPANS[period] ?? SEED_SPANS["7d"],
-    endValue: currentUtil,
-    startValue: Math.max(0, currentUtil * 0.7),
-    noise: 0.08,
-    seed: 101,
-  });
-  return seed.map((p) => ({
-    timestamp: p.timestamp,
-    utilisation: Math.min(100, Math.max(0, p.value)),
-  }));
-}
-
 export function useUtilisationHistory(period: TimePeriod = "7d") {
   const [version, setVersion] = useState(0);
   const [isError, setIsError] = useState(false);
@@ -106,14 +85,9 @@ export function useUtilisationHistory(period: TimePeriod = "7d") {
   }, [metrics]);
 
   const data = useMemo(() => {
-    const filtered = filterByPeriod(snapshotsRef.current, period);
-    // If too few real data points, generate seed data from current value
-    if (filtered.length < MIN_SNAPSHOTS_FOR_CHART && metrics) {
-      return buildSeed(metrics.utilisationRate, period);
-    }
-    return filtered;
+    return filterByPeriod(snapshotsRef.current, period);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, version, metrics]);
+  }, [period, version]);
 
   const refetch = useCallback(() => {
     setIsError(false);

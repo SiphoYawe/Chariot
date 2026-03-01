@@ -84,9 +84,10 @@ export function SharePriceChart() {
         </span>
       </div>
 
-      {chartData.length === 0 ? (
-        <div className="h-[200px] flex items-center justify-center text-sm text-[#6B8A8D]">
-          No price data yet
+      {chartData.length < 2 ? (
+        <div className="h-[200px] flex flex-col items-center justify-center gap-1">
+          <p className="text-sm text-[#6B8A8D]">Collecting price data</p>
+          <p className="text-xs text-[#9CA3AF]">Chart will appear as on-chain snapshots accumulate</p>
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={200}>

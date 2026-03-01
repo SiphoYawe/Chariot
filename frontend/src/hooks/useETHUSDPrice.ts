@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import { useReadContract } from "wagmi";
 import {
   CollateralManagerABI,
@@ -12,9 +12,9 @@ import {
 interface ETHUSDPriceData {
   /** ETH price in USD */
   price: number;
-  /** Last update timestamp (seconds) */
+  /** Unix timestamp (seconds) of when the oracle price last changed on-chain */
   lastUpdated: number;
-  /** Whether the price is stale (> 1 hour) */
+  /** Whether the price is stale (no change for > 1 hour) */
   isStale: boolean;
 }
 
@@ -23,15 +23,19 @@ const WAD = BigInt(10) ** BigInt(18);
 /**
  * Hook for fetching the current ETH/USD price from the CollateralManager oracle.
  * Reads collateralManager.getETHPrice() which returns the price in WAD (18 decimals).
- * Staleness is determined by comparing the data fetch time against STALENESS_THRESHOLD_SECONDS.
+ * Staleness is determined by tracking when the on-chain price actually changes,
+ * not just when the client last fetched.
  */
 export function useETHUSDPrice() {
+  // Track the last known price and when it changed
+  const lastKnownPriceRef = useRef<bigint | null>(null);
+  const lastChangedAtRef = useRef<number>(Math.floor(Date.now() / 1000));
+
   const {
     data: rawPrice,
     isLoading,
     isError,
     refetch: refetchContract,
-    dataUpdatedAt,
   } = useReadContract({
     address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
     abi: CollateralManagerABI,
@@ -42,15 +46,24 @@ export function useETHUSDPrice() {
   const data = useMemo((): ETHUSDPriceData | null => {
     if (rawPrice === undefined) return null;
 
-    const price = Number(rawPrice) / Number(WAD);
-    const lastUpdated = dataUpdatedAt
-      ? Math.floor(dataUpdatedAt / 1000)
-      : Math.floor(Date.now() / 1000);
+    const currentPrice = rawPrice as bigint;
+
+    // Detect actual oracle price changes rather than using client fetch time
+    if (lastKnownPriceRef.current === null) {
+      lastKnownPriceRef.current = currentPrice;
+      lastChangedAtRef.current = Math.floor(Date.now() / 1000);
+    } else if (currentPrice !== lastKnownPriceRef.current) {
+      lastKnownPriceRef.current = currentPrice;
+      lastChangedAtRef.current = Math.floor(Date.now() / 1000);
+    }
+
+    const price = Number(currentPrice) / Number(WAD);
+    const lastUpdated = lastChangedAtRef.current;
     const now = Math.floor(Date.now() / 1000);
     const isStale = now - lastUpdated > STALENESS_THRESHOLD_SECONDS;
 
     return { price, lastUpdated, isStale };
-  }, [rawPrice, dataUpdatedAt]);
+  }, [rawPrice]);
 
   const refetch = useCallback(() => {
     refetchContract();

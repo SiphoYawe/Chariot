@@ -4,9 +4,11 @@ import { useMemo, useCallback } from "react";
 import { useReadContract, useAccount } from "wagmi";
 import {
   ChariotVaultABI,
+  LendingPoolABI,
   CHARIOT_ADDRESSES,
   POLLING_INTERVAL_MS,
   USDC_ERC20_DECIMALS,
+  RATE_MODEL,
 } from "@chariot/shared";
 
 interface LenderPositionData {
@@ -20,7 +22,7 @@ interface LenderPositionData {
   originalDeposit: number;
   /** Accrued earnings = positionValue - originalDeposit */
   accruedEarnings: number;
-  /** Personal APY (annualized return) */
+  /** Personal APY -- uses the vault's current supply APY from the rate model */
   personalAPY: number;
 }
 
@@ -30,6 +32,7 @@ const USDC_DIVISOR = 10 ** USDC_ERC20_DECIMALS;
  * Hook for fetching the lender's position data.
  * Reads vault.balanceOf(user) for share balance and vault.convertToAssets(balance) for position value.
  * Earnings are calculated as positionValue - shareBalance (since initial deposit is 1:1).
+ * APY uses the vault's current supply rate derived from the kinked interest rate model.
  */
 export function useLenderPosition() {
   const { address } = useAccount();
@@ -66,6 +69,21 @@ export function useLenderPosition() {
     },
   });
 
+  // Read vault totalAssets and totalBorrowed to compute current supply APY
+  const { data: rawTotalAssets } = useReadContract({
+    address: CHARIOT_ADDRESSES.CHARIOT_VAULT,
+    abi: ChariotVaultABI,
+    functionName: "totalAssets",
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
+
+  const { data: rawTotalBorrowed } = useReadContract({
+    address: CHARIOT_ADDRESSES.LENDING_POOL,
+    abi: LendingPoolABI,
+    functionName: "getTotalBorrowed",
+    query: { refetchInterval: POLLING_INTERVAL_MS },
+  });
+
   const isLoading = !address ? false : loadingBalance || loadingConvert;
   const isError = errorBalance || errorConvert;
 
@@ -87,11 +105,36 @@ export function useLenderPosition() {
     const originalDeposit = shareBalance;
     const accruedEarnings = positionValue - originalDeposit;
 
-    // Personal APY approximation: based on share price appreciation
-    // Without on-chain deposit timestamp, we estimate conservatively
-    // If sharePrice > 1, there has been yield
-    const personalAPY =
-      sharePrice > 1.0 ? (sharePrice - 1.0) * 365 * 100 : 0;
+    // Use the vault's current supply APY from the kinked interest rate model.
+    // This is the actual earning rate all lenders receive right now.
+    let personalAPY = 0;
+    if (rawTotalAssets !== undefined && rawTotalBorrowed !== undefined) {
+      const totalAssets = Number(rawTotalAssets) / USDC_DIVISOR;
+      const totalBorrowed = Number(rawTotalBorrowed) / USDC_DIVISOR;
+      const utilisationFraction = totalAssets > 0 ? totalBorrowed / totalAssets : 0;
+
+      let borrowRate: number;
+      if (utilisationFraction <= RATE_MODEL.U_OPTIMAL) {
+        borrowRate =
+          RATE_MODEL.R_BASE +
+          RATE_MODEL.R_SLOPE1 * (utilisationFraction / RATE_MODEL.U_OPTIMAL);
+      } else {
+        borrowRate =
+          RATE_MODEL.R_BASE +
+          RATE_MODEL.R_SLOPE1 +
+          RATE_MODEL.R_SLOPE2 *
+            ((utilisationFraction - RATE_MODEL.U_OPTIMAL) /
+              (1 - RATE_MODEL.U_OPTIMAL));
+      }
+
+      const borrowComponent =
+        borrowRate * utilisationFraction * (1 - RATE_MODEL.RESERVE_FACTOR);
+      const tbillComponent =
+        RATE_MODEL.USYC_YIELD *
+        (1 - utilisationFraction) *
+        (1 - RATE_MODEL.STRATEGY_FEE);
+      personalAPY = (borrowComponent + tbillComponent) * 100;
+    }
 
     return {
       shareBalance,
@@ -101,7 +144,7 @@ export function useLenderPosition() {
       accruedEarnings,
       personalAPY,
     };
-  }, [address, rawShareBalance, rawPositionValue]);
+  }, [address, rawShareBalance, rawPositionValue, rawTotalAssets, rawTotalBorrowed]);
 
   const refetch = useCallback(() => {
     refetchBalance();

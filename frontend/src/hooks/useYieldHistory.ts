@@ -4,12 +4,6 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useVaultMetrics } from "./useVaultMetrics";
 import { useLenderPosition } from "./useLenderPosition";
 import { type TimePeriod, PERIOD_CUTOFFS, MIN_SNAPSHOT_INTERVAL_MS } from "@/types/charts";
-import {
-  generateSeedData,
-  MIN_SNAPSHOTS_FOR_CHART,
-  SEED_SPANS,
-  SEED_COUNTS,
-} from "@/lib/chartSeed";
 
 export type { TimePeriod };
 
@@ -62,26 +56,6 @@ function filterByPeriod(data: YieldDataPoint[], period: TimePeriod): YieldDataPo
   return data.filter((d) => d.timestamp >= cutoff);
 }
 
-function buildSeed(
-  currentEarnings: number,
-  sharePrice: number,
-  period: TimePeriod
-): YieldDataPoint[] {
-  const seed = generateSeedData({
-    count: SEED_COUNTS[period] ?? 28,
-    spanMs: SEED_SPANS[period] ?? SEED_SPANS["7d"],
-    endValue: currentEarnings,
-    startValue: 0,
-    noise: 0.03,
-    seed: 202,
-  });
-  return seed.map((p) => ({
-    timestamp: p.timestamp,
-    earnings: Math.max(0, p.value),
-    sharePrice,
-  }));
-}
-
 export function useYieldHistory(period: TimePeriod = "7d") {
   const [version, setVersion] = useState(0);
   const [isError, setIsError] = useState(false);
@@ -116,17 +90,9 @@ export function useYieldHistory(period: TimePeriod = "7d") {
   }, [metrics, position]);
 
   const data = useMemo(() => {
-    const filtered = filterByPeriod(snapshotsRef.current, period);
-    if (filtered.length < MIN_SNAPSHOTS_FOR_CHART && metrics) {
-      return buildSeed(
-        position?.accruedEarnings ?? 0,
-        metrics.sharePrice,
-        period
-      );
-    }
-    return filtered;
+    return filterByPeriod(snapshotsRef.current, period);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, version, metrics, position]);
+  }, [period, version]);
 
   const refetch = useCallback(() => {
     setIsError(false);

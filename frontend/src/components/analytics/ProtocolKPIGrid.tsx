@@ -62,7 +62,7 @@ export function ProtocolKPIGrid() {
       />
       <KPICard
         label="Active Positions"
-        value={data.activePositions.toString()}
+        value={data.activePositions > 0 ? `${data.activePositions}+` : "0"}
         sparkData={data.positionsHistory}
         sparkColor="#037971"
         trend={getTrend(data.positionsHistory)}

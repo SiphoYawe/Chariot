@@ -10,7 +10,6 @@ import {
   USDC_ERC20_DECIMALS,
 } from "@chariot/shared";
 import { MIN_SNAPSHOT_INTERVAL_MS } from "@/types/charts";
-import { generateSeedData } from "@/lib/chartSeed";
 
 export interface ProtocolKPIData {
   tvl: number;
@@ -35,7 +34,6 @@ const USDC_DIVISOR = 10 ** USDC_ERC20_DECIMALS;
 const STORAGE_KEY = "chariot_kpi_history";
 const MAX_SNAPSHOTS = 720;
 const HISTORY_LENGTH = 20;
-const MIN_SPARK_POINTS = 5;
 
 function isValidSnapshot(v: unknown): v is KPISnapshot {
   return (
@@ -80,25 +78,12 @@ function extractHistory(
   return recent.map((s) => s[key]);
 }
 
-/** Generate a spark-chart-friendly array of values from current value */
-function buildSparkSeed(endValue: number, seed: number): number[] {
-  const points = generateSeedData({
-    count: HISTORY_LENGTH,
-    spanMs: 7 * 24 * 60 * 60 * 1000,
-    endValue,
-    startValue: endValue * 0.75,
-    noise: 0.04,
-    seed,
-  });
-  return points.map((p) => Math.max(0, p.value));
-}
-
 /**
  * Hook for protocol KPIs.
  * Reads vault.totalAssets (TVL), lendingPool.getTotalBorrowed,
  * lendingPool.getTotalReserves (revenue proxy).
- * Maintains a localStorage-backed history for spark charts,
- * with seed data generation when history is sparse.
+ * Maintains a localStorage-backed history for spark charts.
+ * Only real on-chain data is used -- no simulated/seed data.
  */
 export function useProtocolKPIs() {
   const [version, setVersion] = useState(0);
@@ -165,11 +150,14 @@ export function useProtocolKPIs() {
     const totalBorrowed = Number(rawTotalBorrowed) / USDC_DIVISOR;
     const revenue = Number(rawTotalReserves) / USDC_DIVISOR;
 
+    // Derive active positions: if there's outstanding debt, at least 1 position exists
+    const activePositions = totalBorrowed > 0 ? 1 : 0;
+
     const snapshot: KPISnapshot = {
       timestamp: Date.now(),
       tvl,
       totalBorrowed,
-      activePositions: 0,
+      activePositions,
       revenue,
     };
 
@@ -209,27 +197,19 @@ export function useProtocolKPIs() {
     const tvl = Number(rawTotalAssets) / USDC_DIVISOR;
     const totalBorrowed = Number(rawTotalBorrowed) / USDC_DIVISOR;
     const revenue = Number(rawTotalReserves) / USDC_DIVISOR;
+    const activePositions = totalBorrowed > 0 ? 1 : 0;
 
     const snapshots = snapshotsRef.current;
-    const hasSufficientHistory = snapshots.length >= MIN_SPARK_POINTS;
 
     return {
       tvl,
       totalBorrowed,
-      activePositions: 0,
+      activePositions,
       revenue,
-      tvlHistory: hasSufficientHistory
-        ? extractHistory(snapshots, "tvl")
-        : buildSparkSeed(tvl, 401),
-      borrowedHistory: hasSufficientHistory
-        ? extractHistory(snapshots, "totalBorrowed")
-        : buildSparkSeed(totalBorrowed, 402),
-      positionsHistory: hasSufficientHistory
-        ? extractHistory(snapshots, "activePositions")
-        : buildSparkSeed(0, 403),
-      revenueHistory: hasSufficientHistory
-        ? extractHistory(snapshots, "revenue")
-        : buildSparkSeed(revenue, 404),
+      tvlHistory: extractHistory(snapshots, "tvl"),
+      borrowedHistory: extractHistory(snapshots, "totalBorrowed"),
+      positionsHistory: extractHistory(snapshots, "activePositions"),
+      revenueHistory: extractHistory(snapshots, "revenue"),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawTotalAssets, rawTotalBorrowed, rawTotalReserves, version]);

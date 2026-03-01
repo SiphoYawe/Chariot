@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import { useReadContract } from "wagmi";
 import {
   CollateralManagerABI,
@@ -10,18 +10,22 @@ import {
 
 interface OraclePriceData {
   ethPrice: number;
-  lastUpdated: number; // Unix timestamp in seconds
+  /** Unix timestamp (seconds) of when the oracle price last changed on-chain */
+  lastUpdated: number;
 }
 
 const WAD = BigInt(10) ** BigInt(18);
 
 export function useOraclePrice() {
+  // Track the last known price and when it changed
+  const lastKnownPriceRef = useRef<bigint | null>(null);
+  const lastChangedAtRef = useRef<number>(Math.floor(Date.now() / 1000));
+
   const {
     data: rawPrice,
     isLoading,
     isError,
     refetch: refetchContract,
-    dataUpdatedAt,
   } = useReadContract({
     address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
     abi: CollateralManagerABI,
@@ -32,15 +36,24 @@ export function useOraclePrice() {
   const data = useMemo((): OraclePriceData | null => {
     if (rawPrice === undefined) return null;
 
-    // ETH price from oracle is in WAD (18 decimals)
-    const ethPrice = Number(rawPrice) / Number(WAD);
-    // Use the query's data update time as an approximation of last updated
-    const lastUpdated = dataUpdatedAt
-      ? Math.floor(dataUpdatedAt / 1000)
-      : Math.floor(Date.now() / 1000);
+    const currentPrice = rawPrice as bigint;
 
-    return { ethPrice, lastUpdated };
-  }, [rawPrice, dataUpdatedAt]);
+    // Detect actual oracle price changes rather than using client fetch time.
+    // When the on-chain price changes, that's when the oracle was truly updated.
+    if (lastKnownPriceRef.current === null) {
+      // First read -- initialize tracking
+      lastKnownPriceRef.current = currentPrice;
+      lastChangedAtRef.current = Math.floor(Date.now() / 1000);
+    } else if (currentPrice !== lastKnownPriceRef.current) {
+      // Price changed on-chain -- oracle was updated
+      lastKnownPriceRef.current = currentPrice;
+      lastChangedAtRef.current = Math.floor(Date.now() / 1000);
+    }
+
+    const ethPrice = Number(currentPrice) / Number(WAD);
+
+    return { ethPrice, lastUpdated: lastChangedAtRef.current };
+  }, [rawPrice]);
 
   const refetch = useCallback(() => {
     refetchContract();
