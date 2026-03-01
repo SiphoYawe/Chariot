@@ -22,8 +22,6 @@ docs/
 # All markdown files except README
 *.md
 !README.md
-!AUDIT_FINDINGS.md
-!DEPLOYMENT_LOG.md
 
 # Claude config
 .claude/
