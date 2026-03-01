@@ -22,7 +22,7 @@ import { useUserPosition } from "@/hooks/useUserPosition";
 import { useBorrowRate } from "@/hooks/useBorrowRate";
 import { useAccount } from "wagmi";
 import { IconWallet } from "@tabler/icons-react";
-import { RISK_PARAMS } from "@chariot/shared";
+import { RISK_PARAMS, DEMO_BORROWER_ADDRESS } from "@chariot/shared";
 
 function formatUsd(n: number): string {
   return n.toLocaleString("en-US", {
@@ -56,9 +56,15 @@ function BorrowPageSkeleton() {
 
 export default function BorrowPage() {
   const { address, isConnected } = useAccount();
-  const collateral = useCollateralData(address);
+  // Try connected wallet first; fall back to demo borrower for display
+  const userCollateral = useCollateralData(address);
+  const demoCollateral = useCollateralData(DEMO_BORROWER_ADDRESS);
+  const userHasCollateral = userCollateral.data?.hasCollateral ?? false;
+  const collateral = userHasCollateral ? userCollateral : demoCollateral;
+
+  const effectiveAddr = userHasCollateral ? address : DEMO_BORROWER_ADDRESS;
   const ethPrice = useETHUSDPrice();
-  const position = useUserPosition(address);
+  const position = useUserPosition(effectiveAddr);
   const borrowRate = useBorrowRate();
 
   // Track whether user is in deposit flow
@@ -128,8 +134,8 @@ export default function BorrowPage() {
 
       {isLoading ? (
         <BorrowPageSkeleton />
-      ) : !isConnected ? (
-        /* Wallet not connected */
+      ) : !isConnected && !hasCollateral ? (
+        /* Wallet not connected and no demo data */
         <EmptyState
           icon={IconWallet}
           headline="Connect Wallet"

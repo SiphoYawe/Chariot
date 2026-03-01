@@ -97,3 +97,8 @@ export const AGENT_CONFIG = {
   MONITORING_INTERVAL_MS: 60_000, // 60 seconds
   MAX_REBALANCES_PER_DAY: 3,
 } as const;
+
+// Demo / testnet deployer address -- used as fallback to show a sample
+// borrow position when the connected wallet has no active position.
+export const DEMO_BORROWER_ADDRESS =
+  "0xaEA0FC6B4738704ef6cfAf24D83199cb8FFf61C0" as `0x${string}`;

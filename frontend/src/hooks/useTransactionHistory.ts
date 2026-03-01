@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useAccount } from "wagmi";
 import { decodeEventLog } from "viem";
 import {
   ChariotVaultABI,
@@ -14,14 +13,6 @@ import type { Transaction } from "@/types/transaction";
 // Blockscout (ArcScan) Etherscan-compatible API -- much more reliable than
 // direct RPC eth_getLogs which Arc Testnet doesn't support well.
 const ARCSCAN_API = "https://testnet.arcscan.app/api";
-
-/**
- * Case-insensitive address comparison for filtering events client-side.
- */
-function addressMatch(a: string | undefined, b: string | undefined): boolean {
-  if (!a || !b) return false;
-  return a.toLowerCase() === b.toLowerCase();
-}
 
 /** Raw log entry from the Blockscout Etherscan-compatible API. */
 interface BlockscoutLog {
@@ -99,7 +90,7 @@ function decodeLogs(
  * Hook for fetching real on-chain transaction history via the ArcScan
  * Blockscout API. Fetches event logs from ChariotVault, LendingPool,
  * and CollateralManager, decodes them using the contract ABIs, and
- * filters by the connected wallet address client-side.
+ * returns ALL protocol events (not filtered by wallet).
  *
  * Uses the Blockscout Etherscan-compatible API instead of direct RPC
  * eth_getLogs because the Arc Testnet RPC doesn't reliably support
@@ -109,15 +100,8 @@ export function useTransactionHistory() {
   const [data, setData] = useState<Transaction[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
-  const { address } = useAccount();
 
   const fetchEvents = useCallback(async () => {
-    if (!address) {
-      setData([]);
-      setIsLoading(false);
-      return;
-    }
-
     try {
       setIsLoading(true);
 
@@ -163,12 +147,12 @@ export function useTransactionHistory() {
 
       const transactions: Transaction[] = [];
 
+      // Show ALL protocol events (not filtered by connected wallet)
+      // so the transaction history displays full protocol activity.
+
       // Vault deposits
       for (const e of vaultEvents) {
-        if (
-          e.eventName === "Deposit" &&
-          addressMatch(e.args.owner as string, address)
-        ) {
+        if (e.eventName === "Deposit") {
           transactions.push({
             id: `${e.transactionHash}-deposit`,
             type: "deposit",
@@ -184,10 +168,7 @@ export function useTransactionHistory() {
 
       // Vault withdrawals
       for (const e of vaultEvents) {
-        if (
-          e.eventName === "Withdraw" &&
-          addressMatch(e.args.receiver as string, address)
-        ) {
+        if (e.eventName === "Withdraw") {
           transactions.push({
             id: `${e.transactionHash}-withdraw`,
             type: "withdrawal",
@@ -203,10 +184,7 @@ export function useTransactionHistory() {
 
       // Borrows
       for (const e of poolEvents) {
-        if (
-          e.eventName === "Borrowed" &&
-          addressMatch(e.args.borrower as string, address)
-        ) {
+        if (e.eventName === "Borrowed") {
           transactions.push({
             id: `${e.transactionHash}-borrow`,
             type: "borrow",
@@ -222,10 +200,7 @@ export function useTransactionHistory() {
 
       // Repayments
       for (const e of poolEvents) {
-        if (
-          e.eventName === "Repaid" &&
-          addressMatch(e.args.borrower as string, address)
-        ) {
+        if (e.eventName === "Repaid") {
           transactions.push({
             id: `${e.transactionHash}-repay`,
             type: "repay",
@@ -241,10 +216,7 @@ export function useTransactionHistory() {
 
       // Collateral deposits
       for (const e of collateralEvents) {
-        if (
-          e.eventName === "CollateralDeposited" &&
-          addressMatch(e.args.user as string, address)
-        ) {
+        if (e.eventName === "CollateralDeposited") {
           transactions.push({
             id: `${e.transactionHash}-collateral_deposit`,
             type: "collateral_deposit",
@@ -260,10 +232,7 @@ export function useTransactionHistory() {
 
       // Collateral withdrawals
       for (const e of collateralEvents) {
-        if (
-          e.eventName === "CollateralWithdrawn" &&
-          addressMatch(e.args.user as string, address)
-        ) {
+        if (e.eventName === "CollateralWithdrawn") {
           transactions.push({
             id: `${e.transactionHash}-collateral_withdrawal`,
             type: "collateral_withdrawal",
@@ -287,7 +256,7 @@ export function useTransactionHistory() {
       setIsError(true);
       setIsLoading(false);
     }
-  }, [address]);
+  }, []);
 
   useEffect(() => {
     fetchEvents();
