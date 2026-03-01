@@ -16,7 +16,7 @@
 
 Chariot is a crosschain collateral lending protocol deployed on [Arc Testnet](https://testnet.arcscan.app). Borrowers deposit ETH on Ethereum as collateral, which is transferred to Arc via a custom ETHEscrow mechanism, and borrow USDC against it at dynamic rates. Lenders deposit USDC into an ERC-4626 vault and earn yield from two simultaneous sources: borrower interest payments and T-bill returns on idle capital via USYC (tokenized US Treasury bills).
 
-Arc serves as the central clearing hub -- all lending, borrowing, and liquidation happens on Arc with sub-second deterministic finality and ~$0.01 transaction fees.
+Arc serves as the central clearing hub - all lending, borrowing, and liquidation happens on Arc with sub-second deterministic finality and ~$0.01 transaction fees.
 
 ## Core Features
 
@@ -44,7 +44,7 @@ LTV ratios and liquidation thresholds adjust dynamically based on oracle volatil
 
 - Formula: `effectiveLTV = baseLTV - K_LTV * excessVol`
 - Liquidation threshold sits at a fixed 7% buffer above effective LTV
-- Currently static at 82% (base LTV 75% + 7% buffer) -- live volatility feeds not active on testnet
+- Currently static at 82% (base LTV 75% + 7% buffer) - live volatility feeds not active on testnet
 - Falls back to static base LTV when feeds are unavailable
 
 ### ETH Collateral Bridge
@@ -71,7 +71,7 @@ Three-level protection system with automatic escalation and de-escalation.
 |-------|---------|--------|
 | 1 | >15% collateral value drop | Pauses new borrows |
 | 2 | >20% pool outflows | Rate-limits withdrawals |
-| 3 | Sustained >95% utilisation or stale oracles | Emergency mode -- requires admin intervention |
+| 3 | Sustained >95% utilisation or stale oracles | Emergency mode - requires admin intervention |
 
 External callers feed metrics via `recordCollateralValue()`, `recordWithdrawal()`, `recordUtilisation()`, and `recordOracleTimestamp()`.
 
@@ -121,7 +121,7 @@ Autonomous Node.js agent managing the USYC rebalancing strategy via a Circle dev
 
 ## Deployed Contracts
 
-### Chariot Protocol -- Arc Testnet (Chain ID: 5042002)
+### Chariot Protocol - Arc Testnet (Chain ID: 5042002)
 
 | Contract | Address |
 |----------|---------|
@@ -135,20 +135,9 @@ Autonomous Node.js agent managing the USYC rebalancing strategy via a Circle dev
 | **BridgedETH** | [`0x42cAA0a88A42b92e1307E625e5253BE0dFABcCc2`](https://testnet.arcscan.app/address/0x42cAA0a88A42b92e1307E625e5253BE0dFABcCc2) |
 | **CircuitBreaker** | [`0x7Ba752d4eF5350B2F187Fa093C4ec4495104AC14`](https://testnet.arcscan.app/address/0x7Ba752d4eF5350B2F187Fa093C4ec4495104AC14) |
 
-### Chariot Protocol -- Ethereum Sepolia (Chain ID: 11155111)
+### Chariot Protocol - Ethereum Sepolia (Chain ID: 11155111)
 
 | Contract | Address |
 |----------|---------|
 | **ETHEscrow** | [`0x42cAA0a88A42b92e1307E625e5253BE0dFABcCc2`](https://sepolia.etherscan.io/address/0x42cAA0a88A42b92e1307E625e5253BE0dFABcCc2) |
 
-### Pre-existing Arc Testnet Addresses
-
-| Token | Address |
-|-------|---------|
-| **USDC (native)** | `0x3600000000000000000000000000000000000000` |
-| **USYC** | `0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C` |
-| **USYC Teller** | `0x9fdF14c5B14173D74C08Af27AebFf39240dC105A` |
-
-## License
-
-MIT
