@@ -22,7 +22,11 @@ export function SignInCard() {
   const [isSigning, setIsSigning] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/dashboard";
+  const rawRedirect = searchParams.get("redirect") ?? "/dashboard";
+  const redirect =
+    rawRedirect.startsWith("/") && !rawRedirect.startsWith("//")
+      ? rawRedirect
+      : "/dashboard";
 
   // Advance step when wallet connects, reset when it disconnects
   useEffect(() => {
@@ -181,7 +185,7 @@ export function SignInCard() {
               </button>
 
               <button
-                onClick={() => setStep("connect")}
+                onClick={() => { setStep("connect"); setError(null); }}
                 className="text-xs text-[#6B8A8D] hover:text-[#037971] transition-colors font-[family-name:var(--font-body)]"
               >
                 Use a different wallet
