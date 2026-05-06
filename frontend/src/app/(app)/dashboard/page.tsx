@@ -11,6 +11,7 @@ import { ProtocolKPIGrid } from "@/components/analytics/ProtocolKPIGrid";
 import { ActivityPulseHeatmap } from "@/components/charts/ActivityPulseHeatmap";
 import { APYWaterfallChart } from "@/components/charts/APYWaterfallChart";
 import { VaultTreemap } from "@/components/charts/VaultTreemap";
+import { LiquidationRiskScatter } from "@/components/charts/LiquidationRiskScatter";
 
 export default function DashboardPage() {
   return (
@@ -66,6 +67,14 @@ export default function DashboardPage() {
           Oracle Data
         </h2>
         <OracleDataDisplay />
+      </section>
+
+      {/* Protocol Risk Map */}
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold font-[family-name:var(--font-heading)] text-[#023436] mb-4">
+          Risk Overview
+        </h2>
+        <LiquidationRiskScatter />
       </section>
     </div>
   );
