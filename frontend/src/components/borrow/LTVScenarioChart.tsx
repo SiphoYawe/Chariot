@@ -21,6 +21,13 @@ interface LTVScenarioChartProps {
 }
 
 const LIQUIDATION_LTV = RISK_PARAMS.BRIDGED_ETH.LIQUIDATION_THRESHOLD * 100;
+
+function ltvColor(ltv: number): string {
+  if (ltv >= LIQUIDATION_LTV) return "#DC2626";
+  if (ltv >= 60) return "#D97706";
+  return "#16A34A";
+}
+
 const SCENARIOS = [
   { label: "-50%", factor: 0.5 },
   { label: "-25%", factor: 0.75 },
@@ -45,7 +52,7 @@ function ScenarioTooltip({ active, payload, label }: ScenarioTooltipProps) {
         <span className="text-xs text-[#6B8A8D]">LTV</span>
         <span
           className="text-sm font-semibold tabular-nums font-[family-name:var(--font-heading)] ml-auto"
-          style={{ color: ltv >= LIQUIDATION_LTV ? "#DC2626" : ltv >= 60 ? "#D97706" : "#16A34A" }}
+          style={{ color: ltvColor(ltv) }}
         >
           {ltv.toFixed(1)}%
         </span>
@@ -105,7 +112,7 @@ export function LTVScenarioChart({ collateralAmountEth, outstandingDebt, current
             {chartData.map((entry) => (
               <Cell
                 key={entry.label}
-                fill={entry.ltv >= LIQUIDATION_LTV ? "#DC2626" : entry.ltv >= 60 ? "#D97706" : "#16A34A"}
+                fill={ltvColor(entry.ltv)}
                 fillOpacity={entry.label === "Current" ? 1 : 0.65}
               />
             ))}
