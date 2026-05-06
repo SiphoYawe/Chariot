@@ -27,6 +27,7 @@ import { SharePriceDisplay } from "@/components/vault/SharePriceDisplay";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { YieldHistoryChart } from "@/components/charts/YieldHistoryChart";
 import { SharePriceChart } from "@/components/charts/SharePriceChart";
+import { YieldRadialChart } from "@/components/charts/YieldRadialChart";
 import { IconLoader2, IconCoinFilled, IconWallet } from "@tabler/icons-react";
 import {
   ADDRESSES,
@@ -559,6 +560,11 @@ export default function LendPage() {
       {/* Vault stats summary -- always visible */}
       <section className="mb-8">
         <VaultStats />
+      </section>
+
+      {/* Yield Attribution */}
+      <section className="mb-8">
+        <YieldRadialChart />
       </section>
 
       {isWalletLoading ? (
