@@ -13,34 +13,37 @@ export async function POST(request: Request) {
   const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
 
   if (!session.nonce) {
-    return Response.json({ error: "No nonce in session. Request a nonce first." }, { status: 422 });
+    console.error("[SIWE] No nonce in session -- session cookie missing or expired");
+    return Response.json({ error: "No nonce in session -- try refreshing and signing in again" }, { status: 422 });
   }
 
   let siweMessage: SiweMessage;
   try {
     siweMessage = new SiweMessage(message);
-  } catch {
+  } catch (e) {
+    console.error("[SIWE] Message parse error:", e);
     return Response.json({ error: "Invalid SIWE message format" }, { status: 422 });
   }
 
-  try {
-    const result = await siweMessage.verify({
-      signature,
-      nonce: session.nonce,
-    });
+  const result = await siweMessage.verify(
+    { signature, nonce: session.nonce },
+    { suppressExceptions: true }
+  );
 
-    if (!result.success) {
-      return Response.json({ error: "Signature verification failed" }, { status: 422 });
-    }
-
-    session.address = result.data.address;
-    session.chainId = result.data.chainId;
-    session.issuedAt = result.data.issuedAt ?? new Date().toISOString();
-    session.nonce = undefined;
-    await session.save();
-
-    return Response.json({ address: session.address });
-  } catch {
-    return Response.json({ error: "Invalid signature" }, { status: 422 });
+  if (!result.success) {
+    const reason = result.error?.type ?? "unknown";
+    console.error("[SIWE] Verification failed:", reason, result.error);
+    return Response.json(
+      { error: `Verification failed: ${reason}` },
+      { status: 422 }
+    );
   }
+
+  session.address = result.data.address;
+  session.chainId = result.data.chainId;
+  session.issuedAt = result.data.issuedAt ?? new Date().toISOString();
+  session.nonce = undefined;
+  await session.save();
+
+  return Response.json({ address: session.address });
 }

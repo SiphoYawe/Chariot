@@ -71,7 +71,8 @@ export function SignInCard() {
       });
 
       if (!verifyRes.ok) {
-        throw new Error("Signature verification failed.");
+        const body = await verifyRes.json().catch(() => null);
+        throw new Error(body?.error ?? "Signature verification failed.");
       }
 
       router.push(redirect);
@@ -80,7 +81,7 @@ export function SignInCard() {
       if (message.toLowerCase().includes("user rejected") || message.toLowerCase().includes("denied")) {
         setError("Sign-in cancelled. Try again to access your account.");
       } else {
-        setError("Sign-in failed. Please try again.");
+        setError(message);
       }
     } finally {
       setIsSigning(false);
