@@ -45,6 +45,13 @@ async function main() {
   // 1. Fund lenders: 22 USDC each (20 to deposit + 2 gas)
   banner("Funding Lender Wallets");
   for (const lender of lenders) {
+    const bal = await publicClient.readContract({
+      address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [lender.address],
+    });
+    if (bal >= usdc(22)) {
+      console.log(`  Skipping ${lender.role} -- already has $${formatUnits(bal, 6)} USDC`);
+      continue;
+    }
     await execTx(
       `Transfer 22 USDC to lender ${lender.role} (${lender.address.slice(0, 8)}...)`,
       deployerClient,
@@ -56,6 +63,13 @@ async function main() {
   // 2. Fund borrowers: 2 USDC gas buffer each
   banner("Funding Borrower Wallets (gas only)");
   for (const borrower of borrowers) {
+    const bal = await publicClient.readContract({
+      address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [borrower.address],
+    });
+    if (bal >= usdc(2)) {
+      console.log(`  Skipping ${borrower.role} gas -- already has $${formatUnits(bal, 6)} USDC`);
+      continue;
+    }
     await execTx(
       `Transfer 2 USDC gas to borrower ${borrower.role} (${borrower.address.slice(0, 8)}...)`,
       deployerClient,
@@ -69,6 +83,13 @@ async function main() {
   for (const cfg of BORROWER_CONFIG) {
     const borrower = borrowers.find((b) => b.role === cfg.role);
     if (!borrower) throw new Error(`Borrower wallet ${cfg.role} not found`);
+    const ethBal = await publicClient.readContract({
+      address: BRIDGED_ETH, abi: BRIDGED_ETH_ABI, functionName: "balanceOf", args: [borrower.address],
+    });
+    if (ethBal >= cfg.ethAmount) {
+      console.log(`  Skipping ${cfg.role} BridgedETH mint -- already has ${formatUnits(ethBal, 18)} ETH`);
+      continue;
+    }
     await execTx(
       `Mint ${formatUnits(cfg.ethAmount, 18)} BridgedETH to ${cfg.role} (nonce=${cfg.nonce})`,
       deployerClient,
