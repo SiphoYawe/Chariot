@@ -11,7 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
-import { useBorrowerPositions, type BorrowerPosition } from "@/hooks/useBorrowerPositions";
+import { useUserPosition } from "@/hooks/useUserPosition";
+import { useAccount } from "wagmi";
 import { truncateAddress } from "@/lib/utils";
 
 function formatUSDC(amount: number): string {
@@ -35,70 +36,9 @@ function getHealthFactorLabel(hf: number): string {
   return "Safe";
 }
 
-function PositionRow({ position }: { position: BorrowerPosition }) {
-  const hfStyle = getHealthFactorStyle(position.healthFactor);
-
-  return (
-    <TableRow className="border-b border-[rgba(3,121,113,0.15)]">
-      <TableCell className="py-3">
-        <span className="font-mono text-xs text-[#023436]">
-          {truncateAddress(position.address)}
-        </span>
-      </TableCell>
-      <TableCell className="py-3 text-right">
-        <div>
-          <span className="text-sm tabular-nums font-[family-name:var(--font-heading)] text-[#023436]">
-            {position.collateralAmount.toFixed(2)} {position.collateralType}
-          </span>
-          <span className="text-xs text-[#9CA3AF] block">
-            {formatUSDC(position.collateralValueUSD)}
-          </span>
-        </div>
-      </TableCell>
-      <TableCell className="py-3 text-right">
-        <span className="text-sm tabular-nums font-[family-name:var(--font-heading)] text-[#023436]">
-          {formatUSDC(position.debtAmount)}
-        </span>
-      </TableCell>
-      <TableCell className="py-3 text-right">
-        <div className="flex items-center justify-end gap-2">
-          <span className={`text-sm tabular-nums font-[family-name:var(--font-heading)] ${hfStyle}`}>
-            {position.healthFactor.toFixed(2)}
-          </span>
-          <span
-            className={`text-xs px-1.5 py-0.5 ${
-              position.healthFactor < 1.0
-                ? "bg-[#DC2626]/10 text-[#DC2626] animate-pulse"
-                : position.healthFactor < 1.2
-                ? "bg-[#DC2626]/10 text-[#DC2626]"
-                : position.healthFactor <= 1.5
-                ? "bg-[#F59E0B]/10 text-[#F59E0B]"
-                : "bg-[#10B981]/10 text-[#10B981]"
-            }`}
-          >
-            {getHealthFactorLabel(position.healthFactor)}
-          </span>
-        </div>
-      </TableCell>
-      <TableCell className="py-3 text-right">
-        {position.healthFactor < 1.0 ? (
-          <Button
-            variant="destructive"
-            size="sm"
-            className="h-7 px-3 text-xs bg-[#DC2626] hover:bg-[#DC2626]/90"
-          >
-            Liquidate
-          </Button>
-        ) : (
-          <span className="text-xs text-[#9CA3AF]">--</span>
-        )}
-      </TableCell>
-    </TableRow>
-  );
-}
-
 export function LiquidatorMonitoringTable() {
-  const { positions, isLoading, isError, refetch } = useBorrowerPositions();
+  const { address } = useAccount();
+  const { data: position, isLoading, isError, refetch } = useUserPosition();
 
   if (isLoading) {
     return (
@@ -110,10 +50,10 @@ export function LiquidatorMonitoringTable() {
   }
 
   if (isError) {
-    return <ErrorState message="Unable to load borrower positions." onRetry={refetch} />;
+    return <ErrorState message="Unable to load your position." onRetry={refetch} />;
   }
 
-  if (positions.length === 0) {
+  if (!address || !position || !position.isActive) {
     return (
       <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
         <h3 className="text-sm font-semibold text-[#023436] font-[family-name:var(--font-heading)] mb-4">
@@ -125,6 +65,9 @@ export function LiquidatorMonitoringTable() {
       </div>
     );
   }
+
+  const hfStyle = getHealthFactorStyle(position.healthFactor);
+  const hfLabel = getHealthFactorLabel(position.healthFactor);
 
   return (
     <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
@@ -153,14 +96,56 @@ export function LiquidatorMonitoringTable() {
               Health Factor
             </TableHead>
             <TableHead className="text-right text-xs font-medium text-[#6B8A8D] uppercase tracking-wider">
-              Action
+              Status
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {positions.map((position) => (
-            <PositionRow key={position.address} position={position} />
-          ))}
+          <TableRow className="border-b border-[rgba(3,121,113,0.15)]">
+            <TableCell className="py-3">
+              <span className="font-mono text-xs text-[#023436]">
+                {truncateAddress(address)}
+              </span>
+            </TableCell>
+            <TableCell className="py-3 text-right">
+              <div>
+                <span className="text-sm tabular-nums font-[family-name:var(--font-heading)] text-[#023436]">
+                  {position.collateralAmount.toFixed(4)} ETH
+                </span>
+                <span className="text-xs text-[#9CA3AF] block">
+                  {formatUSDC(position.collateralValueUsdc)}
+                </span>
+              </div>
+            </TableCell>
+            <TableCell className="py-3 text-right">
+              <span className="text-sm tabular-nums font-[family-name:var(--font-heading)] text-[#023436]">
+                {formatUSDC(position.outstandingDebt)}
+              </span>
+            </TableCell>
+            <TableCell className="py-3 text-right">
+              <div className="flex items-center justify-end gap-2">
+                <span className={`text-sm tabular-nums font-[family-name:var(--font-heading)] ${hfStyle}`}>
+                  {isFinite(position.healthFactor) ? position.healthFactor.toFixed(2) : "--"}
+                </span>
+                <span
+                  className={`text-xs px-1.5 py-0.5 ${
+                    position.healthFactor < 1.0
+                      ? "bg-[#DC2626]/10 text-[#DC2626] animate-pulse"
+                      : position.healthFactor < 1.2
+                      ? "bg-[#DC2626]/10 text-[#DC2626]"
+                      : position.healthFactor <= 1.5
+                      ? "bg-[#F59E0B]/10 text-[#F59E0B]"
+                      : "bg-[#10B981]/10 text-[#10B981]"
+                  }`}
+                >
+                  {hfLabel}
+                </span>
+              </div>
+            </TableCell>
+            <TableCell className="py-3 text-right">
+              <span className="text-xs text-[#9CA3AF]">--</span>
+            </TableCell>
+          </TableRow>
         </TableBody>
       </Table>
     </div>

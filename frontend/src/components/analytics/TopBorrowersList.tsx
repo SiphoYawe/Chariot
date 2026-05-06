@@ -2,74 +2,32 @@
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/feedback/ErrorState";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
-import { useBorrowerPositions } from "@/hooks/useBorrowerPositions";
-import { truncateAddress } from "@/lib/utils";
+import { useUserPosition } from "@/hooks/useUserPosition";
 
 function formatUSDC(value: number): string {
   return `$${value.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })}`;
 }
 
-interface BorrowerTooltipProps {
-  active?: boolean;
-  payload?: Array<{
-    value: number;
-    payload: { name: string; value: number; fullAddress: string };
-  }>;
-}
-
-function BorrowerTooltip({ active, payload }: BorrowerTooltipProps) {
-  if (!active || !payload || payload.length === 0) return null;
-  const entry = payload[0];
-  return (
-    <div className="border border-[rgba(3,121,113,0.15)] bg-white p-3 shadow-sm">
-      <p className="text-xs font-mono text-[#6B8A8D] mb-1">
-        {entry.payload.fullAddress.slice(0, 10)}...{entry.payload.fullAddress.slice(-6)}
-      </p>
-      <p className="text-sm font-semibold tabular-nums font-[family-name:var(--font-heading)] text-[#023436]">
-        {formatUSDC(entry.value)} collateral
-      </p>
-    </div>
-  );
-}
-
 export function TopBorrowersList() {
-  const { positions, isLoading, isError, refetch } = useBorrowerPositions();
+  const { data: position, isLoading, isError, refetch } = useUserPosition();
 
   if (isLoading) {
     return (
       <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
         <Skeleton className="h-4 w-40 mb-4" />
-        <Skeleton className="h-[200px] w-full" />
+        <Skeleton className="h-[120px] w-full" />
       </div>
     );
   }
 
   if (isError) {
-    return <ErrorState message="Unable to load top borrowers." onRetry={refetch} />;
+    return <ErrorState message="Unable to load your collateral position." onRetry={refetch} />;
   }
 
-  // Sort by collateral value descending, take top 10
-  const topBorrowers = [...positions]
-    .sort((a, b) => b.collateralValueUSD - a.collateralValueUSD)
-    .slice(0, 10)
-    .map((p) => ({
-      name: truncateAddress(p.address),
-      value: p.collateralValueUSD,
-      fullAddress: p.address,
-    }));
-
-  if (topBorrowers.length === 0) {
+  if (!position || !position.isActive) {
     return (
       <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
         <h3 className="text-sm font-semibold text-[#023436] font-[family-name:var(--font-heading)] mb-4">
@@ -82,41 +40,66 @@ export function TopBorrowersList() {
     );
   }
 
+  const ltvPct = (position.effectiveLtv * 100).toFixed(1);
+  const ltvColor =
+    position.effectiveLtv > 0.75
+      ? "#DC2626"
+      : position.effectiveLtv > 0.6
+      ? "#F59E0B"
+      : "#10B981";
+
   return (
     <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
       <h3 className="text-sm font-semibold text-[#023436] font-[family-name:var(--font-heading)] mb-4">
         Your Collateral Position
       </h3>
 
-      <ResponsiveContainer width="100%" height={topBorrowers.length * 36 + 20}>
-        <BarChart
-          data={topBorrowers}
-          layout="vertical"
-          margin={{ top: 0, right: 4, bottom: 0, left: 0 }}
-        >
-          <XAxis
-            type="number"
-            tickFormatter={formatUSDC}
-            tick={{ fontSize: 10, fill: "#6B8A8D" }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            type="category"
-            dataKey="name"
-            width={80}
-            tick={{ fontSize: 10, fill: "#6B8A8D", fontFamily: "monospace" }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip content={<BorrowerTooltip />} />
-          <Bar
-            dataKey="value"
-            fill="#03B5AA"
-            animationDuration={500}
-          />
-        </BarChart>
-      </ResponsiveContainer>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-[#6B8A8D] uppercase tracking-wider">Collateral</span>
+          <div className="text-right">
+            <p className="text-sm tabular-nums font-[family-name:var(--font-heading)] text-[#023436] font-semibold">
+              {position.collateralAmount.toFixed(4)} ETH
+            </p>
+            <p className="text-xs text-[#9CA3AF]">{formatUSDC(position.collateralValueUsdc)}</p>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-[#6B8A8D] uppercase tracking-wider">Outstanding Debt</span>
+          <p className="text-sm tabular-nums font-[family-name:var(--font-heading)] text-[#023436] font-semibold">
+            {formatUSDC(position.outstandingDebt)}
+          </p>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-[#6B8A8D] uppercase tracking-wider">Effective LTV</span>
+          <p className="text-sm tabular-nums font-[family-name:var(--font-heading)] font-semibold" style={{ color: ltvColor }}>
+            {ltvPct}%
+          </p>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-[#6B8A8D] uppercase tracking-wider">Liquidation Price</span>
+          <p className="text-sm tabular-nums font-[family-name:var(--font-heading)] text-[#023436] font-semibold">
+            {position.liquidationPrice > 0 ? formatUSDC(position.liquidationPrice) : "--"}
+          </p>
+        </div>
+
+        {/* LTV progress bar */}
+        <div className="pt-1">
+          <div className="w-full h-1.5 bg-[rgba(3,121,113,0.1)] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(position.effectiveLtv * 100, 100)}%`, backgroundColor: ltvColor }}
+            />
+          </div>
+          <div className="flex justify-between mt-1">
+            <span className="text-[10px] text-[#9CA3AF]">0%</span>
+            <span className="text-[10px] text-[#9CA3AF]">LTV 100%</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
