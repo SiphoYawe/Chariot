@@ -10,6 +10,7 @@ import { UtilisationCurveChart } from "@/components/charts/UtilisationCurveChart
 import { ProtocolKPIGrid } from "@/components/analytics/ProtocolKPIGrid";
 import { ActivityPulseHeatmap } from "@/components/charts/ActivityPulseHeatmap";
 import { APYWaterfallChart } from "@/components/charts/APYWaterfallChart";
+import { VaultTreemap } from "@/components/charts/VaultTreemap";
 
 export default function DashboardPage() {
   return (
@@ -47,10 +48,11 @@ export default function DashboardPage() {
         <APYWaterfallChart />
       </section>
 
-      {/* Vault Composition & Utilisation History Charts */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      {/* Vault Composition, Utilisation History & Allocation Treemap */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <VaultCompositionChart />
         <UtilisationHistoryChart />
+        <VaultTreemap />
       </section>
 
       {/* Interactive Rate Curve */}
