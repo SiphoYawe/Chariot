@@ -66,7 +66,7 @@ export function YieldRadialChart() {
 
       <div className="flex items-center gap-6">
         <div className="flex-1">
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={220}>
             <RadialBarChart
               cx="50%"
               cy="50%"
