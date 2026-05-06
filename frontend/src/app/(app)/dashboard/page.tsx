@@ -8,6 +8,7 @@ import { VaultCompositionChart } from "@/components/charts/VaultCompositionChart
 import { UtilisationHistoryChart } from "@/components/charts/UtilisationHistoryChart";
 import { UtilisationCurveChart } from "@/components/charts/UtilisationCurveChart";
 import { ProtocolKPIGrid } from "@/components/analytics/ProtocolKPIGrid";
+import { ActivityPulseHeatmap } from "@/components/charts/ActivityPulseHeatmap";
 
 export default function DashboardPage() {
   return (
@@ -23,6 +24,11 @@ export default function DashboardPage() {
           Protocol KPIs
         </h2>
         <ProtocolKPIGrid />
+      </section>
+
+      {/* Protocol Activity Heatmap */}
+      <section className="mb-8">
+        <ActivityPulseHeatmap />
       </section>
 
       {/* Protocol Metrics */}
