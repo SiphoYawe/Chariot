@@ -14,7 +14,7 @@ function formatUsd(n: number) {
 }
 
 export function LiquidationThermometer({ currentPrice, liquidationPrice, hasDebt, className }: LiquidationThermometerProps) {
-  if (!hasDebt || liquidationPrice <= 0) {
+  if (!hasDebt || liquidationPrice <= 0 || currentPrice <= 0) {
     return (
       <div className={cn("border border-[rgba(3,121,113,0.15)] bg-white p-6", className)}>
         <h3 className="text-sm font-semibold text-[#023436] font-[family-name:var(--font-heading)] mb-2">
@@ -25,7 +25,9 @@ export function LiquidationThermometer({ currentPrice, liquidationPrice, hasDebt
     );
   }
 
-  const scaleMax = currentPrice * 1.4;
+  const isUnderwater = currentPrice <= liquidationPrice;
+
+  const scaleMax = Math.max(currentPrice, liquidationPrice) * 1.4;
   const scaleMin = Math.min(liquidationPrice * 0.7, currentPrice * 0.3);
   const range = scaleMax - scaleMin;
 
@@ -34,8 +36,18 @@ export function LiquidationThermometer({ currentPrice, liquidationPrice, hasDebt
   const bufferPct = Math.max(0, currentPct - liquidationPct);
   const dropNeeded = ((currentPrice - liquidationPrice) / currentPrice) * 100;
 
-  const isCritical = dropNeeded < 10;
-  const isWarning = dropNeeded < 25;
+  const isCritical = isUnderwater || dropNeeded < 10;
+  const isWarning = !isUnderwater && dropNeeded < 25;
+
+  const badgeText = isUnderwater ? "Underwater" : `${dropNeeded.toFixed(1)}% buffer`;
+  const badgeColor = isCritical ? "#DC2626" : isWarning ? "#D97706" : "#16A34A";
+  const badgeBg = isCritical ? "rgba(220,38,38,0.1)" : isWarning ? "rgba(217,119,6,0.1)" : "rgba(22,163,74,0.1)";
+
+  // Clamp label positions to avoid edge overflow
+  const liqLabelPct = Math.max(5, Math.min(liquidationPct, 90));
+  const curLabelPct = Math.max(5, Math.min(currentPct, 95));
+  // Separate labels if they are too close
+  const tooClose = Math.abs(curLabelPct - liqLabelPct) < 15;
 
   return (
     <div className={cn("border border-[rgba(3,121,113,0.15)] bg-white p-6", className)}>
@@ -45,12 +57,9 @@ export function LiquidationThermometer({ currentPrice, liquidationPrice, hasDebt
         </h3>
         <span
           className="text-xs font-medium px-2 py-0.5"
-          style={{
-            color: isCritical ? "#DC2626" : isWarning ? "#D97706" : "#16A34A",
-            backgroundColor: isCritical ? "rgba(220,38,38,0.1)" : isWarning ? "rgba(217,119,6,0.1)" : "rgba(22,163,74,0.1)",
-          }}
+          style={{ color: badgeColor, backgroundColor: badgeBg }}
         >
-          {dropNeeded.toFixed(1)}% buffer
+          {badgeText}
         </span>
       </div>
 
@@ -65,7 +74,7 @@ export function LiquidationThermometer({ currentPrice, liquidationPrice, hasDebt
           style={{ width: `${liquidationPct}%` }}
         />
 
-        {/* Green safe zone (above liquidation up to current) */}
+        {/* Buffer zone (above liquidation up to current) */}
         <div
           className="absolute top-0 bottom-0"
           style={{
@@ -89,26 +98,43 @@ export function LiquidationThermometer({ currentPrice, liquidationPrice, hasDebt
         />
       </div>
 
-      {/* Labels */}
-      <div className="relative h-6 mb-4">
-        <div
-          className="absolute transform -translate-x-1/2 text-center"
-          style={{ left: `${liquidationPct}%` }}
-        >
-          <div className="text-[9px] text-[#DC2626] font-medium whitespace-nowrap">Liquidation</div>
-          <div className="text-[9px] text-[#DC2626] tabular-nums font-[family-name:var(--font-heading)]">${formatUsd(liquidationPrice)}</div>
+      {/* Labels -- stacked when too close to avoid overlap */}
+      {tooClose ? (
+        <div className="flex justify-between mb-4 text-center">
+          <div>
+            <div className="text-[9px] text-[#DC2626] font-medium">Liquidation</div>
+            <div className="text-[9px] text-[#DC2626] tabular-nums font-[family-name:var(--font-heading)]">${formatUsd(liquidationPrice)}</div>
+          </div>
+          <div>
+            <div className="text-[9px] text-[#03B5AA] font-medium">Current</div>
+            <div className="text-[9px] text-[#03B5AA] tabular-nums font-[family-name:var(--font-heading)]">${formatUsd(currentPrice)}</div>
+          </div>
         </div>
-        <div
-          className="absolute transform -translate-x-1/2 text-center"
-          style={{ left: `${Math.min(currentPct, 95)}%` }}
-        >
-          <div className="text-[9px] text-[#03B5AA] font-medium whitespace-nowrap">Current</div>
-          <div className="text-[9px] text-[#03B5AA] tabular-nums font-[family-name:var(--font-heading)]">${formatUsd(currentPrice)}</div>
+      ) : (
+        <div className="relative h-6 mb-4">
+          <div
+            className="absolute transform -translate-x-1/2 text-center"
+            style={{ left: `${liqLabelPct}%` }}
+          >
+            <div className="text-[9px] text-[#DC2626] font-medium whitespace-nowrap">Liquidation</div>
+            <div className="text-[9px] text-[#DC2626] tabular-nums font-[family-name:var(--font-heading)]">${formatUsd(liquidationPrice)}</div>
+          </div>
+          <div
+            className="absolute transform -translate-x-1/2 text-center"
+            style={{ left: `${curLabelPct}%` }}
+          >
+            <div className="text-[9px] text-[#03B5AA] font-medium whitespace-nowrap">Current</div>
+            <div className="text-[9px] text-[#03B5AA] tabular-nums font-[family-name:var(--font-heading)]">${formatUsd(currentPrice)}</div>
+          </div>
         </div>
-      </div>
+      )}
 
       <p className="text-xs text-[#6B8A8D]">
-        ETH must drop <span className="font-semibold tabular-nums text-[#023436] font-[family-name:var(--font-heading)]">{dropNeeded.toFixed(1)}%</span> to trigger liquidation
+        {isUnderwater ? (
+          <>Position is <span className="font-semibold text-[#DC2626] font-[family-name:var(--font-heading)]">underwater</span> -- liquidation threshold has been breached</>
+        ) : (
+          <>ETH must drop <span className="font-semibold tabular-nums text-[#023436] font-[family-name:var(--font-heading)]">{dropNeeded.toFixed(1)}%</span> to trigger liquidation</>
+        )}
       </p>
     </div>
   );
