@@ -10,6 +10,7 @@ import { BorrowerPositionCard } from "@/components/collateral/BorrowerPositionCa
 import { BorrowPanel } from "@/components/borrow/BorrowPanel";
 import { RepayPanel } from "@/components/borrow/RepayPanel";
 import { LiquidationThermometer } from "@/components/borrow/LiquidationThermometer";
+import { LTVScenarioChart } from "@/components/borrow/LTVScenarioChart";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { InterestProjectionChart } from "@/components/borrow/InterestProjectionChart";
 import { ClosedPositionConfirmation } from "@/components/borrow/ClosedPositionConfirmation";
@@ -315,6 +316,11 @@ export default function BorrowPage() {
                 currentPrice={price}
                 liquidationPrice={liquidationPrice}
                 hasDebt={!!hasDebt}
+              />
+              <LTVScenarioChart
+                collateralAmountEth={collateralEth}
+                outstandingDebt={outstandingDebt}
+                currentEthPrice={price}
               />
             </div>
           </div>
