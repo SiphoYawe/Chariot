@@ -500,7 +500,7 @@ function WithdrawPanel() {
 // Lender Position Section
 // ============================================================
 
-function LenderPositionSection() {
+function LenderPositionSection({ onSwitchToDeposit }: { onSwitchToDeposit: () => void }) {
   const { data, isLoading, hasPosition } = useLenderPosition();
 
   if (isLoading) {
@@ -525,12 +525,7 @@ function LenderPositionSection() {
         description="Deposit USDC to earn dual yield from T-Bill-backed USYC tokens and borrower interest. Your deposits are represented as chUSDC shares that appreciate over time."
         action={{
           label: "Deposit USDC",
-          onClick: () => {
-            const depositTab = document.querySelector(
-              '[data-slot="tabs-trigger"][value="deposit"]'
-            ) as HTMLElement;
-            depositTab?.click();
-          },
+          onClick: onSwitchToDeposit,
         }}
       />
     );
@@ -554,6 +549,7 @@ function LenderPositionSection() {
 
 export default function LendPage() {
   const { isConnected } = useAccount();
+  const [activeTab, setActiveTab] = useState("deposit");
 
   return (
     <div className="pb-12">
@@ -583,13 +579,13 @@ export default function LendPage() {
               </div>
 
               {/* Lender position */}
-              <LenderPositionSection />
+              <LenderPositionSection onSwitchToDeposit={() => setActiveTab("deposit")} />
             </div>
 
             {/* Right column -- Action Panel */}
             <div>
               <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6 sticky top-6">
-                <Tabs defaultValue="deposit">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
                   <TabsList
                     variant="line"
                     className="w-full border-b border-[rgba(3,121,113,0.15)] mb-6"

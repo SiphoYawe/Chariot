@@ -94,9 +94,6 @@ export function useLenderPosition() {
     const shareBalance = Number(rawShareBalance) / USDC_DIVISOR;
     const positionValue = Number(rawPositionValue) / USDC_DIVISOR;
 
-    // If user has no shares, return null (no position)
-    if (shareBalance === 0) return null;
-
     // Share price = positionValue / shareBalance
     const sharePrice = shareBalance > 0 ? positionValue / shareBalance : 1.0;
 
@@ -151,5 +148,5 @@ export function useLenderPosition() {
     refetchConvert();
   }, [refetchBalance, refetchConvert]);
 
-  return { data, isLoading, isError, hasPosition: !!data, refetch };
+  return { data, isLoading, isError, hasPosition: data !== null && data.shareBalance > 0, refetch };
 }

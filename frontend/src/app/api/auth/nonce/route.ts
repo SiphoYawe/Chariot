@@ -8,5 +8,7 @@ export async function GET() {
   const nonce = generateNonce();
   session.nonce = nonce;
   await session.save();
-  return Response.json({ nonce });
+  return Response.json({ nonce }, {
+    headers: { "Cache-Control": "no-store" },
+  });
 }
