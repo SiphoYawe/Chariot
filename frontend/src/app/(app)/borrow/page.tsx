@@ -11,6 +11,7 @@ import { BorrowPanel } from "@/components/borrow/BorrowPanel";
 import { RepayPanel } from "@/components/borrow/RepayPanel";
 import { LiquidationThermometer } from "@/components/borrow/LiquidationThermometer";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
+import { InterestProjectionChart } from "@/components/borrow/InterestProjectionChart";
 import { ClosedPositionConfirmation } from "@/components/borrow/ClosedPositionConfirmation";
 import { HealthFactorGauge } from "@/components/risk/HealthFactorGauge";
 import { DataCard } from "@/components/data/DataCard";
@@ -280,6 +281,11 @@ export default function BorrowPage() {
               <FeeBreakdown
                 gasEstimate={0.000024}
                 loading={position.isLoading}
+              />
+
+              <InterestProjectionChart
+                outstandingDebt={outstandingDebt}
+                borrowRate={currentBorrowRate}
               />
 
               <Button
