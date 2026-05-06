@@ -25,7 +25,6 @@ import { useLenderPosition } from "@/hooks/useLenderPosition";
 import { EarningsCounter } from "@/components/vault/EarningsCounter";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { YieldHistoryChart } from "@/components/charts/YieldHistoryChart";
-import { EarningsCohortChart } from "@/components/charts/EarningsCohortChart";
 import { YieldRadialChart } from "@/components/charts/YieldRadialChart";
 import { IconLoader2, IconCoinFilled, IconWallet } from "@tabler/icons-react";
 import {
@@ -629,7 +628,6 @@ export default function LendPage() {
           {/* Full-width section: Charts */}
           <div className="mt-8 space-y-6">
             <YieldHistoryChart />
-            <EarningsCohortChart />
           </div>
         </>
       )}

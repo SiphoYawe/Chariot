@@ -5,7 +5,6 @@ import { CircuitBreakerBanner } from "@/components/feedback/CircuitBreakerBanner
 import { UtilisationHistoryChart } from "@/components/charts/UtilisationHistoryChart";
 import { UtilisationCurveChart } from "@/components/charts/UtilisationCurveChart";
 import { ProtocolKPIGrid } from "@/components/analytics/ProtocolKPIGrid";
-import { APYWaterfallChart } from "@/components/charts/APYWaterfallChart";
 import { VaultCompositionChart } from "@/components/charts/VaultCompositionChart";
 
 export default function DashboardPage() {
@@ -22,10 +21,9 @@ export default function DashboardPage() {
       </section>
 
       {/* Yield & Rate Section */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <YieldDisplay />
         <BorrowRateDisplay />
-        <APYWaterfallChart />
       </section>
 
       {/* Vault Allocation & Utilisation History */}
