@@ -55,7 +55,8 @@ function BorrowPageSkeleton() {
 }
 
 export default function BorrowPage() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, status } = useAccount();
+  const isWalletReconnecting = status === "reconnecting" || status === "connecting";
   const collateral = useCollateralData(address);
   const ethPrice = useETHUSDPrice();
   const position = useUserPosition(address);
@@ -67,7 +68,7 @@ export default function BorrowPage() {
   const [closedPosition, setClosedPosition] = useState<{ collateralReturnedEth: number } | null>(null);
 
   // Loading state
-  const isLoading = collateral.isLoading || ethPrice.isLoading || position.isLoading;
+  const isLoading = isWalletReconnecting || collateral.isLoading || ethPrice.isLoading || position.isLoading;
 
   // Error state
   if (collateral.isError || ethPrice.isError) {

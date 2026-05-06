@@ -13,6 +13,7 @@ import {
   type PreviewRow,
 } from "@/components/transaction/TransactionPreview";
 import { ApprovalStep, type ApprovalState } from "@/components/transaction/ApprovalStep";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionConfirmation } from "@/components/feedback/TransactionConfirmation";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { EmptyState } from "@/components/feedback/EmptyState";
@@ -548,7 +549,8 @@ function LenderPositionSection({ onSwitchToDeposit }: { onSwitchToDeposit: () =>
 // ============================================================
 
 export default function LendPage() {
-  const { isConnected } = useAccount();
+  const { isConnected, status } = useAccount();
+  const isWalletLoading = status === "reconnecting" || status === "connecting";
   const [activeTab, setActiveTab] = useState("deposit");
 
   return (
@@ -560,7 +562,15 @@ export default function LendPage() {
         <VaultStats />
       </section>
 
-      {!isConnected ? (
+      {isWalletLoading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,400px)] gap-8">
+          <div className="space-y-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-48 w-full" />
+          </div>
+          <Skeleton className="h-80 w-full" />
+        </div>
+      ) : !isConnected ? (
         <EmptyState
           icon={IconWallet}
           headline="Connect Wallet"
