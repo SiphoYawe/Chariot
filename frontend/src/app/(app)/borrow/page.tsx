@@ -6,12 +6,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { CollateralDepositFlow } from "@/components/bridge/CollateralDepositFlow";
-import { CollateralTable, buildCollateralRows } from "@/components/collateral/CollateralTable";
 import { BorrowerPositionCard } from "@/components/collateral/BorrowerPositionCard";
 import { BorrowPanel } from "@/components/borrow/BorrowPanel";
 import { RepayPanel } from "@/components/borrow/RepayPanel";
-import { BorrowRateDisplay } from "@/components/borrow/BorrowRateDisplay";
-import { RateBreakdown } from "@/components/vault/RateBreakdown";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { ClosedPositionConfirmation } from "@/components/borrow/ClosedPositionConfirmation";
 import { HealthFactorGauge } from "@/components/risk/HealthFactorGauge";
@@ -108,14 +105,6 @@ export default function BorrowPage() {
   // Borrow rate
   const currentBorrowRate = borrowRate.data?.borrowRate ?? 0;
   const currentUtilisation = borrowRate.data?.utilisation ?? 0;
-
-  const collateralRows = hasCollateral && collateral.data
-    ? buildCollateralRows(
-        collateral.data.collateralBalance,
-        collateral.data.collateralValueUsdc,
-        price
-      )
-    : [];
 
   const handleRefreshAll = () => {
     collateral.refetch();
@@ -290,21 +279,6 @@ export default function BorrowPage() {
               <FeeBreakdown
                 gasEstimate={0.000024}
                 loading={position.isLoading}
-              />
-
-              {/* Rate breakdown with education tooltips */}
-              <RateBreakdown />
-
-              {/* Borrow rate display */}
-              <BorrowRateDisplay
-                borrowRate={currentBorrowRate}
-                utilisation={currentUtilisation}
-              />
-
-              {/* Collateral table */}
-              <CollateralTable
-                rows={collateralRows}
-                isLoading={collateral.isLoading}
               />
 
               <Button

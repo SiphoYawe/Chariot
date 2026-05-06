@@ -24,7 +24,6 @@ import { PositionCard } from "@/components/collateral/PositionCard";
 import { useLenderPosition } from "@/hooks/useLenderPosition";
 import { EarningsCounter } from "@/components/vault/EarningsCounter";
 import { SharePriceDisplay } from "@/components/vault/SharePriceDisplay";
-import { UtilisationBar } from "@/components/vault/UtilisationBar";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { YieldHistoryChart } from "@/components/charts/YieldHistoryChart";
 import { SharePriceChart } from "@/components/charts/SharePriceChart";
@@ -632,8 +631,6 @@ export default function LendPage() {
               <YieldHistoryChart />
               <SharePriceChart />
             </div>
-
-            <UtilisationBar />
           </div>
         </>
       )}
