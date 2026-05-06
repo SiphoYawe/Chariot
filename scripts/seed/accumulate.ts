@@ -85,8 +85,9 @@ async function runCycle(cycleNum: number) {
 
 async function main() {
   const lenders = getLenders();
-  console.log(`Starting accumulation loop with ${lenders.length} lenders. Press Ctrl+C to stop.`);
-  console.log(`With ${lenders.length} wallets @ 20 USDC each, one cycle = ~$${lenders.length * 20} TVL.\n`);
+  const once = process.argv.includes("--once");
+  console.log(`Starting accumulation${once ? " (single cycle)" : " loop"} with ${lenders.length} lenders.`);
+  console.log(`With funded wallets @ 20 USDC each, one cycle = ~$1,460 TVL.\n`);
 
   let cycle = 1;
   while (running) {
@@ -96,11 +97,11 @@ async function main() {
       console.error(`  ERROR in cycle ${cycle - 1}: ${(e as Error).message}`);
       appendLog({ label: `cycle-${cycle - 1}-error`, hash: "n/a", status: "failed", note: String(e) });
     }
-    if (!running) break;
+    if (once || !running) break;
     console.log(`\nSleeping 2 hours until next cycle... (${new Date().toISOString()})`);
     await sleep(TWO_HOURS_MS);
   }
-  console.log("Accumulation loop stopped.");
+  console.log("Accumulation done.");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
