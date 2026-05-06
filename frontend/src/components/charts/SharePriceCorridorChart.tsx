@@ -26,9 +26,9 @@ const WINDOW = 20; // rolling window size for std dev band
 
 function computeCorridorData(prices: { timestamp: number; price: number }[]) {
   return prices.map((pt, i) => {
-    const window = prices.slice(Math.max(0, i - WINDOW), i + 1).map((p) => p.price);
-    const mean = window.reduce((s, v) => s + v, 0) / window.length;
-    const variance = window.reduce((s, v) => s + (v - mean) ** 2, 0) / window.length;
+    const priceWindow = prices.slice(Math.max(0, i - WINDOW), i + 1).map((p) => p.price);
+    const mean = priceWindow.reduce((s, v) => s + v, 0) / priceWindow.length;
+    const variance = priceWindow.reduce((s, v) => s + (v - mean) ** 2, 0) / priceWindow.length;
     const std = Math.sqrt(variance);
     return {
       timestamp: pt.timestamp,
@@ -52,7 +52,7 @@ function CorridorTooltip({ active, payload, label }: CorridorTooltipProps) {
   return (
     <div className="border border-[rgba(3,121,113,0.15)] bg-white p-3 shadow-sm">
       <p className="text-xs text-[#6B8A8D] mb-1.5 font-[family-name:var(--font-heading)]">
-        {label ? new Date(label).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
+        {label != null ? new Date(label).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
       </p>
       <div className="flex items-center gap-2">
         <span className="w-2 h-2 shrink-0 bg-[#03B5AA]" />
@@ -75,8 +75,13 @@ export function SharePriceCorridorChart() {
     return new Date(v).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }, []);
 
-  const yMin = chartData.length ? Math.min(...chartData.map((d) => d.lower)) * 0.9999 : 0.9995;
-  const yMax = chartData.length ? Math.max(...chartData.map((d) => d.upper)) * 1.0001 : 1.0010;
+  const [yMin, yMax] = useMemo(() => {
+    if (!chartData.length) return [0.9995, 1.0010];
+    return [
+      Math.min(...chartData.map((d) => d.lower)) * 0.9999,
+      Math.max(...chartData.map((d) => d.upper)) * 1.0001,
+    ];
+  }, [chartData]);
 
   if (isLoading) {
     return (
@@ -94,7 +99,7 @@ export function SharePriceCorridorChart() {
           <h3 className="text-sm font-semibold text-[#023436] font-[family-name:var(--font-heading)]">
             chUSDC Share Price
           </h3>
-          <p className="text-xs text-[#6B8A8D] mt-0.5">With +-1 std deviation corridor</p>
+          <p className="text-xs text-[#6B8A8D] mt-0.5">With ±1 std deviation corridor</p>
         </div>
         <div className="flex gap-1" role="tablist">
           {PERIODS.map((p) => (
