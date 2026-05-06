@@ -18,29 +18,41 @@ interface WeekBucket {
   earnings: number;
 }
 
-function bucketByWeek(data: { timestamp: number; earnings: number }[]): WeekBucket[] {
-  if (data.length === 0) return [];
+function isoWeek(utcMs: number): { year: number; week: number } {
+  const d = new Date(utcMs);
+  const day = d.getUTCDay() || 7; // Sun=0 -> 7 for ISO Monday-first weeks
+  d.setUTCDate(d.getUTCDate() + 4 - day); // shift to Thursday of this ISO week
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return { year: d.getUTCFullYear(), week };
+}
 
-  // Find earnings delta per data point
+function bucketByWeek(data: { timestamp: number; earnings: number }[] | undefined): WeekBucket[] {
+  if (!data || data.length === 0) return [];
+
+  // Compute earnings deltas between consecutive data points
   const deltas: { timestamp: number; delta: number }[] = [];
   for (let i = 1; i < data.length; i++) {
     const delta = Math.max(0, data[i].earnings - data[i - 1].earnings);
     deltas.push({ timestamp: data[i].timestamp, delta });
   }
 
-  // Group into ISO week buckets
-  const map = new Map<string, number>();
+  // Group into ISO week buckets, keyed by "YYYY-Www" to avoid cross-year collision
+  const map = new Map<string, { label: string; total: number }>();
   for (const d of deltas) {
-    const date = new Date(d.timestamp);
-    const year = date.getUTCFullYear();
-    // ISO week number
-    const startOfYear = new Date(Date.UTC(year, 0, 1));
-    const week = Math.ceil(((date.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getUTCDay() + 1) / 7);
-    const key = `W${week}`;
-    map.set(key, (map.get(key) ?? 0) + d.delta);
+    const { year, week } = isoWeek(d.timestamp);
+    const key = `${year}-W${String(week).padStart(2, "0")}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.total += d.delta;
+    } else {
+      map.set(key, { label: `W${week}`, total: d.delta });
+    }
   }
 
-  return Array.from(map.entries()).map(([week, earnings]) => ({ week, earnings }));
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, { label, total }]) => ({ week: label, earnings: total }));
 }
 
 interface EarningsTooltipProps {
