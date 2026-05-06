@@ -166,7 +166,7 @@ export function UtilisationCurveChart() {
             stroke="#DC2626"
             strokeWidth={2}
             dot={false}
-            animationDuration={500}
+            isAnimationActive={false}
           />
           <Line
             type="linear"
@@ -175,7 +175,7 @@ export function UtilisationCurveChart() {
             stroke="#10B981"
             strokeWidth={2}
             dot={false}
-            animationDuration={500}
+            isAnimationActive={false}
           />
           {/* Current utilisation markers -- all use same snapped X */}
           <ReferenceDot

@@ -23,7 +23,6 @@ import { useVaultWithdraw } from "@/hooks/useVaultWithdraw";
 import { PositionCard } from "@/components/collateral/PositionCard";
 import { useLenderPosition } from "@/hooks/useLenderPosition";
 import { EarningsCounter } from "@/components/vault/EarningsCounter";
-import { SharePriceDisplay } from "@/components/vault/SharePriceDisplay";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { YieldHistoryChart } from "@/components/charts/YieldHistoryChart";
 import { EarningsCohortChart } from "@/components/charts/EarningsCohortChart";
@@ -587,11 +586,7 @@ export default function LendPage() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,400px)] gap-8 items-stretch">
             {/* Left column -- Position info */}
             <div className="space-y-6">
-              {/* Earnings & Share Price side-by-side */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <EarningsCounter />
-                <SharePriceDisplay />
-              </div>
+              <EarningsCounter />
 
               {/* Lender position */}
               <LenderPositionSection onSwitchToDeposit={() => setActiveTab("deposit")} />
