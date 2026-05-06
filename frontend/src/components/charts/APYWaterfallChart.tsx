@@ -52,6 +52,15 @@ export function APYWaterfallChart() {
   const borrow = data?.borrowInterestComponent ?? 0;
   const total = data?.supplyAPY ?? 0;
 
+  if (!data || (tbill === 0 && borrow === 0 && total === 0)) {
+    return (
+      <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
+        <h3 className="text-sm font-semibold text-[#023436] font-[family-name:var(--font-heading)] mb-4">APY Build-Up</h3>
+        <div className="h-[200px] flex items-center justify-center text-sm text-[#6B8A8D]">No yield data available yet</div>
+      </div>
+    );
+  }
+
   // Waterfall: invisible bottom bar lifts each segment to its correct position
   const chartData = [
     {
@@ -90,7 +99,7 @@ export function APYWaterfallChart() {
       </div>
 
       <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={chartData} margin={{ top: 16, right: 8, bottom: 0, left: 0 }}>
+        <BarChart data={chartData} margin={{ top: 24, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(3,121,113,0.08)" vertical={false} />
           <XAxis
             dataKey="name"
@@ -110,8 +119,8 @@ export function APYWaterfallChart() {
           <Bar dataKey="invisible" stackId="a" fill="transparent" />
           {/* Visible value bar */}
           <Bar dataKey="value" stackId="a" radius={[2, 2, 0, 0]}>
-            {chartData.map((entry) => (
-              <Cell key={entry.name} fill={entry.color} />
+            {chartData.map((entry, i) => (
+              <Cell key={i} fill={entry.color} />
             ))}
             <LabelList
               dataKey="display"
