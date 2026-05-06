@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useRepay } from "@/hooks/useRepay";
 import { useWithdrawCollateral } from "@/hooks/useWithdrawCollateral";
@@ -42,25 +42,50 @@ export function RepayPanel({
   const [amount, setAmount] = useState("");
   const repay = useRepay();
   const withdraw = useWithdrawCollateral();
+  const pendingRepayAmount = useRef<string | null>(null);
+  const pendingFullRepay = useRef(false);
 
   const parsedAmount = parseFloat(amount) || 0;
   const isRepaying = repay.status === "repaying" || repay.status === "approving";
   const isWithdrawing = withdraw.status === "withdrawing";
 
-  const handlePartialRepay = async () => {
-    if (repay.needsApproval) {
-      await repay.approve();
+  // When approval confirms, fire the queued repay
+  useEffect(() => {
+    if (repay.status === "approved") {
+      if (pendingFullRepay.current) {
+        pendingFullRepay.current = false;
+        repay.repayFull();
+      } else if (pendingRepayAmount.current !== null) {
+        const amt = pendingRepayAmount.current;
+        pendingRepayAmount.current = null;
+        repay.repay(amt);
+      }
     }
-    await repay.repay(amount);
-    onSuccess?.();
+  }, [repay.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fire onSuccess when repay confirms
+  useEffect(() => {
+    if (repay.status === "confirmed") {
+      onSuccess?.();
+    }
+  }, [repay.status, onSuccess]);
+
+  const handlePartialRepay = () => {
+    if (repay.needsApproval) {
+      pendingRepayAmount.current = amount;
+      repay.approve(amount);
+    } else {
+      repay.repay(amount);
+    }
   };
 
-  const handleFullRepay = async () => {
+  const handleFullRepay = () => {
     if (repay.needsApproval) {
-      await repay.approve();
+      pendingFullRepay.current = true;
+      repay.approve(outstandingDebt.toFixed(6));
+    } else {
+      repay.repayFull();
     }
-    await repay.repayFull();
-    onSuccess?.();
   };
 
   const handleWithdraw = async () => {

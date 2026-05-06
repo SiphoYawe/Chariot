@@ -60,9 +60,18 @@ export function useBridgeStatus(nonce: number | null) {
     },
   });
 
-  const [prevBalance] = useState<bigint | null>(null);
+  const [prevBalance, setPrevBalance] = useState<bigint | null>(null);
   const [data, setData] = useState<BridgeStatusData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Capture initial BridgedETH balance when bridge starts; reset when bridge resets.
+  useEffect(() => {
+    if (nonce !== null && prevBalance === null && bridgedBalance !== undefined) {
+      setPrevBalance(bridgedBalance);
+    } else if (nonce === null && prevBalance !== null) {
+      setPrevBalance(null);
+    }
+  }, [nonce, bridgedBalance, prevBalance]);
 
   useEffect(() => {
     if (nonce === null) {

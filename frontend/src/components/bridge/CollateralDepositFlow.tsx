@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { BridgeProgress } from "@/components/bridge/BridgeProgress";
 import { useETHEscrowDeposit } from "@/hooks/useETHEscrowDeposit";
@@ -58,10 +58,11 @@ export function CollateralDepositFlow({
 
   const showBridgeProgress = escrow.status === "confirmed" && bridge.data !== null;
 
-  // Trigger onComplete when bridge finishes
-  if (bridge.data?.isComplete && onComplete) {
-    onComplete();
-  }
+  useEffect(() => {
+    if (bridge.data?.isComplete && onComplete) {
+      onComplete();
+    }
+  }, [bridge.data?.isComplete, onComplete]);
 
   const handleDeposit = async () => {
     await escrow.deposit(amount);

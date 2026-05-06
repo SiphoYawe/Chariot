@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useBorrow } from "@/hooks/useBorrow";
 import { RISK_PARAMS } from "@chariot/shared";
@@ -63,9 +63,14 @@ export function BorrowPanel({
 
   const isBorrowing = status === "borrowing";
 
-  const handleBorrow = async () => {
-    await borrow(amount);
-    onSuccess?.();
+  useEffect(() => {
+    if (status === "confirmed") {
+      onSuccess?.();
+    }
+  }, [status, onSuccess]);
+
+  const handleBorrow = () => {
+    borrow(amount);
   };
 
   const handleMaxClick = () => {

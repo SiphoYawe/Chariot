@@ -29,7 +29,8 @@ interface UseRepayReturn {
   errorMessage: string | null;
   needsApproval: boolean;
   /** Approve USDC spending for LendingPool */
-  approve: () => void;
+  /** Approve USDC spending for LendingPool for the given amount */
+  approve: (amount: string) => void;
   /** Execute partial repay */
   repay: (amount: string) => void;
   /** Execute full repay (uses repayFull on the contract) */
@@ -130,13 +131,14 @@ export function useRepay(): UseRepayReturn {
 
   // -- Actions --
 
-  const approve = useCallback(() => {
+  const approve = useCallback((amount: string) => {
     if (!address) {
       setStatus("error");
       setErrorMessage("Wallet not connected.");
       return;
     }
 
+    setRepayAmount(amount);
     setStatus("approving");
     setErrorMessage(null);
 
@@ -144,9 +146,9 @@ export function useRepay(): UseRepayReturn {
       address: ADDRESSES.USDC as `0x${string}`,
       abi: ERC20ABI,
       functionName: "approve",
-      args: [CHARIOT_ADDRESSES.LENDING_POOL, parseUnits(repayAmount, 6)],
+      args: [CHARIOT_ADDRESSES.LENDING_POOL, parseUnits(amount, 6)],
     });
-  }, [address, repayAmount, writeApprove]);
+  }, [address, writeApprove]);
 
   const repay = useCallback(
     (amount: string) => {
