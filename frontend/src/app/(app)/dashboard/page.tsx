@@ -6,7 +6,7 @@ import { UtilisationHistoryChart } from "@/components/charts/UtilisationHistoryC
 import { UtilisationCurveChart } from "@/components/charts/UtilisationCurveChart";
 import { ProtocolKPIGrid } from "@/components/analytics/ProtocolKPIGrid";
 import { APYWaterfallChart } from "@/components/charts/APYWaterfallChart";
-import { VaultTreemap } from "@/components/charts/VaultTreemap";
+import { VaultCompositionChart } from "@/components/charts/VaultCompositionChart";
 
 export default function DashboardPage() {
   return (
@@ -30,7 +30,7 @@ export default function DashboardPage() {
 
       {/* Vault Allocation & Utilisation History */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <VaultTreemap />
+        <VaultCompositionChart />
         <UtilisationHistoryChart />
       </section>
 
