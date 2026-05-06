@@ -14,14 +14,20 @@ const WALLET_ROLES = [
   "B1", "B2", "B3", "B4", "B5",
 ];
 
+const outPath = path.resolve(__dirname, "wallets.json");
+
+if (fs.existsSync(outPath)) {
+  console.error(`ERROR: ${outPath} already exists. Delete it manually if you want to regenerate.`);
+  process.exit(1);
+}
+
 const wallets = WALLET_ROLES.map((role) => {
   const privateKey = generatePrivateKey();
   const account = privateKeyToAccount(privateKey);
   return { role, address: account.address, privateKey };
 });
 
-const outPath = path.resolve(__dirname, "wallets.json");
-fs.writeFileSync(outPath, JSON.stringify(wallets, null, 2));
+fs.writeFileSync(outPath, JSON.stringify(wallets, null, 2), { mode: 0o600 });
 
 console.log("Generated wallets:");
 wallets.forEach((w) => console.log(`  ${w.role}: ${w.address}`));
