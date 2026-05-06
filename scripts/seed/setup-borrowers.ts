@@ -35,39 +35,53 @@ async function setupBorrower(cfg: BorrowerSetup) {
   const borrower = getWallet(cfg.role);
   const client = walletClientFor(borrower);
 
-  // Check BridgedETH balance
-  const bridgedEthBal = await publicClient.readContract({
-    address: BRIDGED_ETH, abi: BRIDGED_ETH_ABI, functionName: "balanceOf",
-    args: [borrower.address],
-  });
-  console.log(`  BridgedETH balance: ${formatUnits(bridgedEthBal, 18)} ETH`);
-  if (bridgedEthBal < cfg.collateralAmount) {
-    throw new Error(`${cfg.role} has insufficient BridgedETH: ${formatUnits(bridgedEthBal, 18)} < ${formatUnits(cfg.collateralAmount, 18)}`);
+  // Check existing collateral balance (idempotent -- skip deposit if already done)
+  const existingCollateral = await publicClient.readContract({
+    address: COLLATERAL_MANAGER, abi: COLLATERAL_ABI, functionName: "getCollateralBalance",
+    args: [borrower.address, BRIDGED_ETH],
+  }) as bigint;
+
+  if (existingCollateral >= cfg.collateralAmount) {
+    console.log(`  Collateral already deposited: ${formatUnits(existingCollateral, 18)} ETH -- skipping deposit`);
+  } else {
+    const bridgedEthBal = await publicClient.readContract({
+      address: BRIDGED_ETH, abi: BRIDGED_ETH_ABI, functionName: "balanceOf", args: [borrower.address],
+    }) as bigint;
+    console.log(`  BridgedETH balance: ${formatUnits(bridgedEthBal, 18)} ETH`);
+    if (bridgedEthBal < cfg.collateralAmount) {
+      throw new Error(`${cfg.role} has insufficient BridgedETH: ${formatUnits(bridgedEthBal, 18)} < ${formatUnits(cfg.collateralAmount, 18)}`);
+    }
+
+    await execTx(`${cfg.role}: approve CollateralManager for ${formatUnits(cfg.collateralAmount, 18)} ETH`, client, {
+      address: BRIDGED_ETH, abi: BRIDGED_ETH_ABI, functionName: "approve",
+      args: [COLLATERAL_MANAGER, cfg.collateralAmount],
+    });
+    await execTx(`${cfg.role}: deposit ${formatUnits(cfg.collateralAmount, 18)} BridgedETH as collateral`, client, {
+      address: COLLATERAL_MANAGER, abi: COLLATERAL_ABI, functionName: "depositCollateral",
+      args: [BRIDGED_ETH, cfg.collateralAmount],
+    });
   }
 
-  // Step 1: Approve CollateralManager
-  await execTx(`${cfg.role}: approve CollateralManager for ${formatUnits(cfg.collateralAmount, 18)} ETH`, client, {
-    address: BRIDGED_ETH, abi: BRIDGED_ETH_ABI, functionName: "approve",
-    args: [COLLATERAL_MANAGER, cfg.collateralAmount],
-  });
+  // Check existing debt (skip borrow if already borrowed)
+  const existingDebt = await publicClient.readContract({
+    address: LENDING_POOL, abi: POOL_ABI, functionName: "getUserDebt", args: [borrower.address],
+  }) as bigint;
 
-  // Step 2: Deposit collateral
-  await execTx(`${cfg.role}: deposit ${formatUnits(cfg.collateralAmount, 18)} BridgedETH as collateral`, client, {
-    address: COLLATERAL_MANAGER, abi: COLLATERAL_ABI, functionName: "depositCollateral",
-    args: [BRIDGED_ETH, cfg.collateralAmount],
-  });
+  if (existingDebt >= cfg.borrowAmount) {
+    console.log(`  Already has debt $${formatUnits(existingDebt, 6)} -- skipping borrow`);
+  } else {
+    // Refresh oracle before borrow (staleness threshold 3600s)
+    await execTx("Refresh ETHUSD oracle before borrow", deployerClient, {
+      address: SIMPLE_ORACLE, abi: ORACLE_ABI, functionName: "setPriceNow",
+      args: [ETHUSD_FEED_ID, ETH_PRICE_WAD],
+    });
 
-  // Step 3: Refresh oracle before borrow (staleness threshold 3600s)
-  await execTx("Refresh ETHUSD oracle before borrow", deployerClient, {
-    address: SIMPLE_ORACLE, abi: ORACLE_ABI, functionName: "setPriceNow",
-    args: [ETHUSD_FEED_ID, ETH_PRICE_WAD],
-  });
-
-  // Step 4: Borrow USDC
-  await execTx(`${cfg.role}: borrow $${formatUnits(cfg.borrowAmount, 6)} USDC`, client, {
-    address: LENDING_POOL, abi: POOL_ABI, functionName: "borrow",
-    args: [BRIDGED_ETH, cfg.borrowAmount, []],
-  });
+    await execTx(`${cfg.role}: borrow $${formatUnits(cfg.borrowAmount, 6)} USDC`, client, {
+      address: LENDING_POOL, abi: POOL_ABI, functionName: "borrow",
+      args: [BRIDGED_ETH, cfg.borrowAmount, []],
+      gas: 500_000n,
+    });
+  }
 
   // Print resulting position
   const [debt, collateralVal] = await Promise.all([
