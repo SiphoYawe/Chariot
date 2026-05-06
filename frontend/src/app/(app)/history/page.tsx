@@ -14,6 +14,9 @@ import { ErrorState } from "@/components/feedback/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { IconClockFilled } from "@tabler/icons-react";
+import { TransactionCalendarHeatmap } from "@/components/activity/TransactionCalendarHeatmap";
+import { PLWaterfallChart } from "@/components/activity/PLWaterfallChart";
+import { AssetFlowSankey } from "@/components/activity/AssetFlowSankey";
 
 function TransactionSkeletons() {
   return (
@@ -103,17 +106,38 @@ function NoFilterResults({
 export default function HistoryPage() {
   const { data, isLoading, isError, refetch } = useTransactionHistory();
   const [activeFilter, setActiveFilter] = useState<FilterOption>("all");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const filteredTransactions = useMemo(() => {
     if (!data) return null;
     const allowedTypes = FILTER_TYPE_MAP[activeFilter];
-    if (!allowedTypes) return data;
-    return data.filter((tx) => allowedTypes.includes(tx.type));
-  }, [data, activeFilter]);
+    let txs = allowedTypes ? data.filter((tx) => allowedTypes.includes(tx.type)) : data;
+    if (selectedDate) {
+      txs = txs.filter((tx) => new Date(tx.timestamp).toISOString().slice(0, 10) === selectedDate);
+    }
+    return txs;
+  }, [data, activeFilter, selectedDate]);
 
   return (
     <div className="pb-12">
       <PageHeader title="Transaction History" />
+
+      {/* Charts -- only shown when transactions exist */}
+      {data && data.length > 0 && (
+        <>
+          <section className="mb-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <TransactionCalendarHeatmap
+              transactions={data}
+              onDateSelect={setSelectedDate}
+              selectedDate={selectedDate}
+            />
+            <PLWaterfallChart transactions={data} />
+          </section>
+          <section className="mb-6">
+            <AssetFlowSankey transactions={data} />
+          </section>
+        </>
+      )}
 
       {/* Filter bar */}
       <section className="mb-6">
