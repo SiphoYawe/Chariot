@@ -26,7 +26,7 @@ import { EarningsCounter } from "@/components/vault/EarningsCounter";
 import { SharePriceDisplay } from "@/components/vault/SharePriceDisplay";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { YieldHistoryChart } from "@/components/charts/YieldHistoryChart";
-import { SharePriceChart } from "@/components/charts/SharePriceChart";
+import { SharePriceCorridorChart } from "@/components/charts/SharePriceCorridorChart";
 import { YieldRadialChart } from "@/components/charts/YieldRadialChart";
 import { IconLoader2, IconCoinFilled, IconWallet } from "@tabler/icons-react";
 import {
@@ -635,7 +635,7 @@ export default function LendPage() {
           <div className="mt-8 space-y-6">
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <YieldHistoryChart />
-              <SharePriceChart />
+              <SharePriceCorridorChart />
             </div>
           </div>
         </>
