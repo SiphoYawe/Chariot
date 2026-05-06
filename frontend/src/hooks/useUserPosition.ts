@@ -10,6 +10,7 @@ import {
   RISK_PARAMS,
   USDC_ERC20_DECIMALS,
 } from "@chariot/shared";
+import { useMarketEthPrice } from "./useMarketEthPrice";
 
 interface UserPositionData {
   /** Original borrowed principal in USDC */
@@ -45,6 +46,8 @@ const USDC_DIVISOR = 10 ** USDC_ERC20_DECIMALS;
 export function useUserPosition(_user?: `0x${string}`) {
   const { address: connectedAddress } = useAccount();
   const user = _user ?? connectedAddress;
+
+  const { price: ethPrice, isLoading: loadingPrice, isError: errorPrice } = useMarketEthPrice();
 
   // Read user position (principal, interestIndex, lastAccrualTimestamp)
   const {
@@ -97,19 +100,6 @@ export function useUserPosition(_user?: `0x${string}`) {
     },
   });
 
-  // Read ETH price (WAD)
-  const {
-    data: rawEthPrice,
-    isLoading: loadingPrice,
-    isError: errorPrice,
-    refetch: refetchPrice,
-  } = useReadContract({
-    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
-    abi: CollateralManagerABI,
-    functionName: "getETHPrice",
-    query: { refetchInterval: POLLING_INTERVAL_MS },
-  });
-
   const isLoading = !user
     ? false
     : loadingPosition || loadingDebt || loadingCollateral || loadingPrice;
@@ -121,7 +111,7 @@ export function useUserPosition(_user?: `0x${string}`) {
       rawPosition === undefined ||
       rawDebt === undefined ||
       rawCollateral === undefined ||
-      rawEthPrice === undefined
+      ethPrice === null
     ) {
       return null;
     }
@@ -141,8 +131,6 @@ export function useUserPosition(_user?: `0x${string}`) {
     const collateralWei = rawCollateral as bigint;
     const collateralAmount = Number(collateralWei) / Number(WAD);
 
-    // ETH price in USD
-    const ethPrice = Number(rawEthPrice) / Number(WAD);
     const collateralValueUsdc = collateralAmount * ethPrice;
 
     const isActive = outstandingDebt > 0 || collateralAmount > 0;
@@ -198,14 +186,13 @@ export function useUserPosition(_user?: `0x${string}`) {
       maxAdditionalBorrow,
       isActive,
     };
-  }, [user, rawPosition, rawDebt, rawCollateral, rawEthPrice]);
+  }, [user, rawPosition, rawDebt, rawCollateral, ethPrice]);
 
   const refetch = useCallback(() => {
     refetchPosition();
     refetchDebt();
     refetchCollateral();
-    refetchPrice();
-  }, [refetchPosition, refetchDebt, refetchCollateral, refetchPrice]);
+  }, [refetchPosition, refetchDebt, refetchCollateral]);
 
   return { data, isLoading, isError, refetch };
 }

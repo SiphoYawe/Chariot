@@ -9,6 +9,7 @@ import {
   POLLING_INTERVAL_MS,
   RISK_PARAMS,
 } from "@chariot/shared";
+import { useMarketEthPrice } from "./useMarketEthPrice";
 
 interface CollateralData {
   /** BridgedETH balance in CollateralManager (wei) */
@@ -34,6 +35,8 @@ export function useCollateralData(_user?: `0x${string}`) {
   const { address: connectedAddress } = useAccount();
   const user = _user ?? connectedAddress;
 
+  const { price: ethPrice, isLoading: loadingPrice, isError: errorPrice } = useMarketEthPrice();
+
   const {
     data: rawCollateralBalance,
     isLoading: loadingCollateral,
@@ -48,18 +51,6 @@ export function useCollateralData(_user?: `0x${string}`) {
       enabled: !!user,
       refetchInterval: POLLING_INTERVAL_MS,
     },
-  });
-
-  const {
-    data: rawEthPrice,
-    isLoading: loadingPrice,
-    isError: errorPrice,
-    refetch: refetchPrice,
-  } = useReadContract({
-    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
-    abi: CollateralManagerABI,
-    functionName: "getETHPrice",
-    query: { refetchInterval: POLLING_INTERVAL_MS },
   });
 
   const {
@@ -87,7 +78,7 @@ export function useCollateralData(_user?: `0x${string}`) {
     if (!user) return null;
     if (
       rawCollateralBalance === undefined ||
-      rawEthPrice === undefined ||
+      ethPrice === null ||
       rawWalletBalance === undefined
     ) {
       return null;
@@ -95,9 +86,7 @@ export function useCollateralData(_user?: `0x${string}`) {
 
     const collateralBalance = rawCollateralBalance as bigint;
     const walletBalance = rawWalletBalance as bigint;
-    const ethPrice = Number(rawEthPrice) / Number(WAD);
 
-    // collateralBalance is in wei (18 decimals), convert to ETH then to USD
     const collateralEth = Number(collateralBalance) / Number(WAD);
     const collateralValueUsdc = collateralEth * ethPrice;
     const hasCollateral = collateralBalance > BigInt(0);
@@ -109,13 +98,12 @@ export function useCollateralData(_user?: `0x${string}`) {
       effectiveLtv: RISK_PARAMS.BRIDGED_ETH.BASE_LTV,
       hasCollateral,
     };
-  }, [user, rawCollateralBalance, rawEthPrice, rawWalletBalance]);
+  }, [user, rawCollateralBalance, ethPrice, rawWalletBalance]);
 
   const refetch = useCallback(() => {
     refetchCollateral();
-    refetchPrice();
     refetchWallet();
-  }, [refetchCollateral, refetchPrice, refetchWallet]);
+  }, [refetchCollateral, refetchWallet]);
 
   return { data, isLoading, isError, refetch };
 }

@@ -9,6 +9,7 @@ import {
   RISK_PARAMS,
   USDC_ERC20_DECIMALS,
 } from "@chariot/shared";
+import { useMarketEthPrice } from "./useMarketEthPrice";
 
 export interface BorrowerPosition {
   address: string;
@@ -67,12 +68,13 @@ async function discoverProtocolUsers(): Promise<string[]> {
 export function useBorrowerPositions() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
+  const { price: marketEthPrice } = useMarketEthPrice();
   const [positions, setPositions] = useState<BorrowerPosition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
 
   const fetchPositions = useCallback(async () => {
-    if (!publicClient) return;
+    if (!publicClient || marketEthPrice === null) return;
 
     try {
       setIsLoading(true);
@@ -91,13 +93,8 @@ export function useBorrowerPositions() {
         return;
       }
 
-      // 2. Read ETH price
-      const rawEthPrice = await publicClient.readContract({
-        address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER as `0x${string}`,
-        abi: CollateralManagerABI,
-        functionName: "getETHPrice",
-      });
-      const ethPrice = Number(rawEthPrice as bigint) / Number(WAD);
+      // 2. Use market ETH price
+      const ethPrice = marketEthPrice;
 
       // 3. Query each address's debt and collateral in parallel
       const addrs = Array.from(allAddresses);
@@ -157,7 +154,7 @@ export function useBorrowerPositions() {
     } finally {
       setIsLoading(false);
     }
-  }, [address, publicClient]);
+  }, [address, publicClient, marketEthPrice]);
 
   useEffect(() => {
     fetchPositions();

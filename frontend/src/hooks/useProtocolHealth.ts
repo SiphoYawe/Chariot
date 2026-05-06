@@ -5,12 +5,12 @@ import { useReadContract } from "wagmi";
 import {
   ChariotVaultABI,
   LendingPoolABI,
-  CollateralManagerABI,
   BridgedETHABI,
   CHARIOT_ADDRESSES,
   POLLING_INTERVAL_MS,
   USDC_ERC20_DECIMALS,
 } from "@chariot/shared";
+import { useMarketEthPrice } from "./useMarketEthPrice";
 
 interface ProtocolHealthData {
   tvl: number;
@@ -23,6 +23,8 @@ const USDC_DIVISOR = 10 ** USDC_ERC20_DECIMALS;
 const WAD = BigInt(10) ** BigInt(18);
 
 export function useProtocolHealth() {
+  const { price: ethPrice, isLoading: loadingEthPrice, isError: errorEthPrice } = useMarketEthPrice();
+
   const {
     data: rawTotalAssets,
     isLoading: loadingAssets,
@@ -73,19 +75,6 @@ export function useProtocolHealth() {
     query: { refetchInterval: POLLING_INTERVAL_MS },
   });
 
-  // Read current ETH price for collateral valuation
-  const {
-    data: rawEthPrice,
-    isLoading: loadingEthPrice,
-    isError: errorEthPrice,
-    refetch: refetchEthPrice,
-  } = useReadContract({
-    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
-    abi: CollateralManagerABI,
-    functionName: "getETHPrice",
-    query: { refetchInterval: POLLING_INTERVAL_MS },
-  });
-
   const isLoading =
     loadingAssets ||
     loadingBorrowed ||
@@ -112,29 +101,21 @@ export function useProtocolHealth() {
     const totalDebt = Number(rawTotalBorrowed) / USDC_DIVISOR;
     const protocolReserves = Number(rawTotalReserves) / USDC_DIVISOR;
 
-    // Calculate real total collateral: BridgedETH held by CollateralManager * ETH price
     let totalCollateral = 0;
-    if (rawCollateralEth !== undefined && rawEthPrice !== undefined) {
+    if (rawCollateralEth !== undefined && ethPrice !== null) {
       const collateralEth = Number(rawCollateralEth as bigint) / Number(WAD);
-      const ethPrice = Number(rawEthPrice as bigint) / Number(WAD);
       totalCollateral = collateralEth * ethPrice;
     }
 
-    return {
-      tvl,
-      totalCollateral,
-      totalDebt,
-      protocolReserves,
-    };
-  }, [rawTotalAssets, rawTotalBorrowed, rawTotalReserves, rawCollateralEth, rawEthPrice]);
+    return { tvl, totalCollateral, totalDebt, protocolReserves };
+  }, [rawTotalAssets, rawTotalBorrowed, rawTotalReserves, rawCollateralEth, ethPrice]);
 
   const refetch = useCallback(() => {
     refetchAssets();
     refetchBorrowed();
     refetchReserves();
     refetchCollateralEth();
-    refetchEthPrice();
-  }, [refetchAssets, refetchBorrowed, refetchReserves, refetchCollateralEth, refetchEthPrice]);
+  }, [refetchAssets, refetchBorrowed, refetchReserves, refetchCollateralEth]);
 
   return { data, isLoading, isError, refetch };
 }
