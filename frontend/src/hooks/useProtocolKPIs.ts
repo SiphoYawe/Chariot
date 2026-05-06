@@ -14,20 +14,20 @@ import { MIN_SNAPSHOT_INTERVAL_MS } from "@/types/charts";
 export interface ProtocolKPIData {
   tvl: number;
   totalBorrowed: number;
-  activePositions: number;
-  revenue: number;
+  totalIdle: number;
+  utilisationRate: number;
   tvlHistory: number[];
   borrowedHistory: number[];
-  positionsHistory: number[];
-  revenueHistory: number[];
+  idleHistory: number[];
+  utilisationHistory: number[];
 }
 
 interface KPISnapshot {
   timestamp: number;
   tvl: number;
   totalBorrowed: number;
-  activePositions: number;
-  revenue: number;
+  totalIdle: number;
+  utilisationRate: number;
 }
 
 const USDC_DIVISOR = 10 ** USDC_ERC20_DECIMALS;
@@ -41,9 +41,7 @@ function isValidSnapshot(v: unknown): v is KPISnapshot {
     v !== null &&
     typeof (v as KPISnapshot).timestamp === "number" &&
     typeof (v as KPISnapshot).tvl === "number" &&
-    typeof (v as KPISnapshot).totalBorrowed === "number" &&
-    typeof (v as KPISnapshot).activePositions === "number" &&
-    typeof (v as KPISnapshot).revenue === "number"
+    typeof (v as KPISnapshot).totalBorrowed === "number"
   );
 }
 
@@ -117,19 +115,6 @@ export function useProtocolKPIs() {
     query: { refetchInterval: POLLING_INTERVAL_MS },
   });
 
-  // Read totalReserves (revenue proxy)
-  const {
-    data: rawTotalReserves,
-    isLoading: loadingReserves,
-    isError: errorReserves,
-    refetch: refetchReserves,
-  } = useReadContract({
-    address: CHARIOT_ADDRESSES.LENDING_POOL,
-    abi: LendingPoolABI,
-    functionName: "getTotalReserves",
-    query: { refetchInterval: POLLING_INTERVAL_MS },
-  });
-
   // Lazy-initialize from localStorage
   if (!initializedRef.current && typeof window !== "undefined") {
     snapshotsRef.current = loadSnapshots();
@@ -138,27 +123,19 @@ export function useProtocolKPIs() {
 
   // Record new snapshots when contract data updates
   useEffect(() => {
-    if (
-      rawTotalAssets === undefined ||
-      rawTotalBorrowed === undefined ||
-      rawTotalReserves === undefined
-    ) {
-      return;
-    }
+    if (rawTotalAssets === undefined || rawTotalBorrowed === undefined) return;
 
     const tvl = Number(rawTotalAssets) / USDC_DIVISOR;
     const totalBorrowed = Number(rawTotalBorrowed) / USDC_DIVISOR;
-    const revenue = Number(rawTotalReserves) / USDC_DIVISOR;
-
-    // Derive active positions: if there's outstanding debt, at least 1 position exists
-    const activePositions = totalBorrowed > 0 ? 1 : 0;
+    const totalIdle = Math.max(0, tvl - totalBorrowed);
+    const utilisationRate = tvl > 0 ? (totalBorrowed / tvl) * 100 : 0;
 
     const snapshot: KPISnapshot = {
       timestamp: Date.now(),
       tvl,
       totalBorrowed,
-      activePositions,
-      revenue,
+      totalIdle,
+      utilisationRate,
     };
 
     const last = snapshotsRef.current[snapshotsRef.current.length - 1];
@@ -167,28 +144,24 @@ export function useProtocolKPIs() {
       saveSnapshots(snapshotsRef.current);
       setVersion((v) => v + 1);
     }
-  }, [rawTotalAssets, rawTotalBorrowed, rawTotalReserves]);
+  }, [rawTotalAssets, rawTotalBorrowed]);
 
-  const contractError = errorAssets || errorBorrowed || errorReserves;
+  const contractError = errorAssets || errorBorrowed;
 
   const data = useMemo((): ProtocolKPIData | null => {
-    if (
-      rawTotalAssets === undefined ||
-      rawTotalBorrowed === undefined ||
-      rawTotalReserves === undefined
-    ) {
+    if (rawTotalAssets === undefined || rawTotalBorrowed === undefined) {
       if (snapshotsRef.current.length > 0) {
         const latest = snapshotsRef.current[snapshotsRef.current.length - 1];
         const hist = snapshotsRef.current;
         return {
           tvl: latest.tvl,
           totalBorrowed: latest.totalBorrowed,
-          activePositions: latest.activePositions,
-          revenue: latest.revenue,
+          totalIdle: latest.totalIdle ?? Math.max(0, latest.tvl - latest.totalBorrowed),
+          utilisationRate: latest.utilisationRate ?? (latest.tvl > 0 ? (latest.totalBorrowed / latest.tvl) * 100 : 0),
           tvlHistory: extractHistory(hist, "tvl"),
           borrowedHistory: extractHistory(hist, "totalBorrowed"),
-          positionsHistory: extractHistory(hist, "activePositions"),
-          revenueHistory: extractHistory(hist, "revenue"),
+          idleHistory: hist.slice(-HISTORY_LENGTH).map((s) => s.totalIdle ?? Math.max(0, s.tvl - s.totalBorrowed)),
+          utilisationHistory: hist.slice(-HISTORY_LENGTH).map((s) => s.utilisationRate ?? (s.tvl > 0 ? (s.totalBorrowed / s.tvl) * 100 : 0)),
         };
       }
       return null;
@@ -196,32 +169,31 @@ export function useProtocolKPIs() {
 
     const tvl = Number(rawTotalAssets) / USDC_DIVISOR;
     const totalBorrowed = Number(rawTotalBorrowed) / USDC_DIVISOR;
-    const revenue = Number(rawTotalReserves) / USDC_DIVISOR;
-    const activePositions = totalBorrowed > 0 ? 1 : 0;
+    const totalIdle = Math.max(0, tvl - totalBorrowed);
+    const utilisationRate = tvl > 0 ? (totalBorrowed / tvl) * 100 : 0;
 
     const snapshots = snapshotsRef.current;
 
     return {
       tvl,
       totalBorrowed,
-      activePositions,
-      revenue,
+      totalIdle,
+      utilisationRate,
       tvlHistory: extractHistory(snapshots, "tvl"),
       borrowedHistory: extractHistory(snapshots, "totalBorrowed"),
-      positionsHistory: extractHistory(snapshots, "activePositions"),
-      revenueHistory: extractHistory(snapshots, "revenue"),
+      idleHistory: snapshots.slice(-HISTORY_LENGTH).map((s) => s.totalIdle ?? Math.max(0, s.tvl - s.totalBorrowed)),
+      utilisationHistory: snapshots.slice(-HISTORY_LENGTH).map((s) => s.utilisationRate ?? (s.tvl > 0 ? (s.totalBorrowed / s.tvl) * 100 : 0)),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawTotalAssets, rawTotalBorrowed, rawTotalReserves, version]);
+  }, [rawTotalAssets, rawTotalBorrowed, version]);
 
-  const isLoading = loadingAssets || loadingBorrowed || loadingReserves;
+  const isLoading = loadingAssets || loadingBorrowed;
 
   const refetch = useCallback(() => {
     setIsError(false);
     refetchAssets();
     refetchBorrowed();
-    refetchReserves();
-  }, [refetchAssets, refetchBorrowed, refetchReserves]);
+  }, [refetchAssets, refetchBorrowed]);
 
   return { data, isLoading, isError: isError || contractError, refetch };
 }

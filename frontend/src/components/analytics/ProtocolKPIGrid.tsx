@@ -6,12 +6,8 @@ import { KPICard } from "./KPICard";
 import { useProtocolKPIs } from "@/hooks/useProtocolKPIs";
 
 function formatCompact(value: number): string {
-  if (value >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(2)}M`;
-  }
-  if (value >= 1_000) {
-    return `$${(value / 1_000).toFixed(1)}K`;
-  }
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
   return `$${value.toFixed(2)}`;
 }
 
@@ -33,8 +29,8 @@ export function ProtocolKPIGrid() {
 
   if (isLoading || !data) {
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {[...Array(3)].map((_, i) => (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
           <div key={i} className="border border-[rgba(3,121,113,0.15)] bg-white p-5">
             <Skeleton className="h-3 w-20 mb-3" />
             <Skeleton className="h-7 w-28" />
@@ -45,27 +41,34 @@ export function ProtocolKPIGrid() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <KPICard
-        label="TVL"
+        label="Total Value Locked"
         value={formatCompact(data.tvl)}
         sparkData={data.tvlHistory}
         sparkColor="#03B5AA"
         trend={getTrend(data.tvlHistory)}
       />
       <KPICard
-        label="Total Borrowed"
+        label="Total Borrowed USDC"
         value={formatCompact(data.totalBorrowed)}
         sparkData={data.borrowedHistory}
         sparkColor="#F59E0B"
         trend={getTrend(data.borrowedHistory)}
       />
       <KPICard
-        label="Active Positions"
-        value={data.activePositions > 0 ? `${data.activePositions}+` : "0"}
-        sparkData={data.positionsHistory}
+        label="Idle in Pool"
+        value={formatCompact(data.totalIdle)}
+        sparkData={data.idleHistory}
         sparkColor="#037971"
-        trend={getTrend(data.positionsHistory)}
+        trend={getTrend(data.idleHistory)}
+      />
+      <KPICard
+        label="Pool Utilisation"
+        value={`${data.utilisationRate.toFixed(1)}%`}
+        sparkData={data.utilisationHistory}
+        sparkColor="#6B8A8D"
+        trend={getTrend(data.utilisationHistory)}
       />
     </div>
   );
