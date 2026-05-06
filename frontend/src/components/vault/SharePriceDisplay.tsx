@@ -67,8 +67,8 @@ export function SharePriceDisplay({ className }: SharePriceDisplayProps) {
       </p>
 
       {/* Share price value */}
-      <div className="flex items-baseline gap-2 mb-2">
-        <span className="text-2xl font-bold font-[family-name:var(--font-heading)] tabular-nums text-[#023436]">
+      <div className="mb-2">
+        <span className="text-2xl font-bold font-[family-name:var(--font-heading)] tabular-nums text-[#023436] block mb-1">
           ${sharePrice.toFixed(6)}
         </span>
         <TrendIndicator

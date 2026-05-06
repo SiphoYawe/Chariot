@@ -33,8 +33,8 @@ export function ProtocolKPIGrid() {
 
   if (isLoading || !data) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="border border-[rgba(3,121,113,0.15)] bg-white p-5">
             <Skeleton className="h-3 w-20 mb-3" />
             <Skeleton className="h-7 w-28" />
@@ -45,7 +45,7 @@ export function ProtocolKPIGrid() {
   }
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <KPICard
         label="TVL"
         value={formatCompact(data.tvl)}
@@ -66,13 +66,6 @@ export function ProtocolKPIGrid() {
         sparkData={data.positionsHistory}
         sparkColor="#037971"
         trend={getTrend(data.positionsHistory)}
-      />
-      <KPICard
-        label="Protocol Revenue"
-        value={formatCompact(data.revenue)}
-        sparkData={data.revenueHistory}
-        sparkColor="#10B981"
-        trend={getTrend(data.revenueHistory)}
       />
     </div>
   );
