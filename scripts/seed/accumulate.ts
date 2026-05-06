@@ -3,6 +3,9 @@
 // Run: cd chariot && npx tsx scripts/seed/accumulate.ts
 // Stop: Ctrl+C (waits for in-flight txs to settle)
 
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { formatUnits } from "viem";
 import {
   USDC, CHARIOT_VAULT, SIMPLE_ORACLE,
@@ -18,8 +21,22 @@ import { banner, appendLog } from "./lib/logger.js";
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
+const PENDING_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "pending.json");
+
+function loadPending(): Record<string, bigint> {
+  if (fs.existsSync(PENDING_PATH)) {
+    const raw = JSON.parse(fs.readFileSync(PENDING_PATH, "utf-8")) as Record<string, string>;
+    return { L8: BigInt(raw.L8 ?? "0"), L9: BigInt(raw.L9 ?? "0") };
+  }
+  return { L8: 0n, L9: 0n };
+}
+
+function savePending(state: Record<string, bigint>) {
+  fs.writeFileSync(PENDING_PATH, JSON.stringify({ L8: state.L8.toString(), L9: state.L9.toString() }, null, 2));
+}
+
 // L8 and L9 accumulate across 2 cycles before depositing
-const pendingAccumulation: Record<string, bigint> = { L8: 0n, L9: 0n };
+const pendingAccumulation: Record<string, bigint> = loadPending();
 
 let running = true;
 process.on("SIGINT", () => {
@@ -93,6 +110,7 @@ async function runCycle(cycleNum: number) {
   // 5. L8-L9: accumulate; deposit every 2 cycles (40 USDC)
   pendingAccumulation["L8"] = (pendingAccumulation["L8"] ?? 0n) + usdc(20);
   pendingAccumulation["L9"] = (pendingAccumulation["L9"] ?? 0n) + usdc(20);
+  savePending(pendingAccumulation);
   for (const role of ["L8", "L9"]) {
     const accumulated = pendingAccumulation[role];
     if (accumulated >= usdc(40)) {
@@ -107,6 +125,7 @@ async function runCycle(cycleNum: number) {
         args: [accumulated, lender.address],
       });
       pendingAccumulation[role] = 0n;
+      savePending(pendingAccumulation);
     } else {
       console.log(`  ${role}: accumulated ${formatUnits(accumulated, 6)} USDC -- depositing next cycle`);
     }
@@ -138,7 +157,12 @@ async function main() {
 
   let cycle = 1;
   while (running) {
-    await runCycle(cycle++);
+    try {
+      await runCycle(cycle++);
+    } catch (e) {
+      console.error(`  ERROR in cycle ${cycle - 1}: ${(e as Error).message}`);
+      appendLog({ label: `cycle-${cycle - 1}-error`, hash: "n/a", status: "failed", note: String(e) });
+    }
     if (!running) break;
     console.log(`\nSleeping 2 hours until next cycle... (${new Date().toISOString()})`);
     await sleep(TWO_HOURS_MS);

@@ -13,6 +13,7 @@ Thumbs.db
 _bmad/
 _bmad-output/
 scripts/seed/wallets.json
+scripts/seed/pending.json
 
 # Documentation folders
 arc-docs/
