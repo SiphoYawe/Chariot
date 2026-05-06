@@ -60,9 +60,12 @@ async function depositAvailable(role: string) {
     return;
   }
 
+  // Set explicit gas limit -- Arc's eth_estimateGas returns inflated values that cause
+  // the native-USDC gas pre-charge to consume more than the $0.50 reserve before transferFrom runs.
   await execTx(`${role}: deposit $${formatUnits(toDeposit, 6)}`, client, {
     address: CHARIOT_VAULT, abi: VAULT_ABI, functionName: "deposit",
     args: [toDeposit, lender.address],
+    gas: 400_000n,
   });
   await sleep(300);
 }
