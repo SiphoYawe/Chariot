@@ -11,6 +11,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function loadEnv(): Record<string, string> {
   const envPath = path.resolve(__dirname, "../../../contracts/.env");
+  if (!fs.existsSync(envPath)) {
+    throw new Error(
+      `contracts/.env not found at ${envPath}. Copy contracts/.env.example and fill in DEPLOYER_PRIVATE_KEY.`
+    );
+  }
   const content = fs.readFileSync(envPath, "utf-8");
   return Object.fromEntries(
     content
@@ -18,7 +23,9 @@ function loadEnv(): Record<string, string> {
       .filter((l) => l.includes("=") && !l.startsWith("#"))
       .map((l) => {
         const idx = l.indexOf("=");
-        return [l.slice(0, idx).trim(), l.slice(idx + 1).trim()];
+        const key = l.slice(0, idx).trim();
+        const val = l.slice(idx + 1).trim().replace(/^["']|["']$/g, "");
+        return [key, val];
       })
   );
 }
@@ -26,7 +33,9 @@ function loadEnv(): Record<string, string> {
 const env = loadEnv();
 
 export const DEPLOYER_KEY = env.DEPLOYER_PRIVATE_KEY as `0x${string}`;
-if (!DEPLOYER_KEY) throw new Error("DEPLOYER_PRIVATE_KEY not set in contracts/.env");
+if (!DEPLOYER_KEY || DEPLOYER_KEY.length < 66) {
+  throw new Error("DEPLOYER_PRIVATE_KEY in contracts/.env is missing or malformed (expected 0x + 64 hex chars)");
+}
 
 export const deployerAccount = privateKeyToAccount(DEPLOYER_KEY);
 

@@ -66,6 +66,7 @@ export const COLLATERAL_ABI = [
 ] as const;
 
 export const POOL_ABI = [
+  // priceUpdates components is [] because deployed contracts use SimpleOracle -- seed scripts always pass [] for this param
   { type: "function", name: "borrow", inputs: [{ name: "collateralToken", type: "address" }, { name: "amount", type: "uint256" }, { name: "priceUpdates", type: "tuple[]", components: [] }], outputs: [], stateMutability: "nonpayable" },
   { type: "function", name: "repay", inputs: [{ name: "amount", type: "uint256" }], outputs: [], stateMutability: "nonpayable" },
   { type: "function", name: "getTotalBorrowed", inputs: [], outputs: [{ name: "", type: "uint256" }], stateMutability: "view" },

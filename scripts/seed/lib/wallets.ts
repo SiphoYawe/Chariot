@@ -26,7 +26,13 @@ export function loadWallets(): SeedWallet[] {
     address: `0x${string}`;
     privateKey: `0x${string}`;
   }>;
-  _cache = raw.map((w) => ({ ...w, account: privateKeyToAccount(w.privateKey) }));
+  _cache = raw.map((w) => {
+    const account = privateKeyToAccount(w.privateKey);
+    if (w.address.toLowerCase() !== account.address.toLowerCase()) {
+      throw new Error(`Wallet "${w.role}" address mismatch: JSON says ${w.address}, key derives ${account.address}`);
+    }
+    return { ...w, account };
+  });
   return _cache;
 }
 
