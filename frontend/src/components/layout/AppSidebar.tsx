@@ -3,9 +3,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAccount, useChainId } from "wagmi";
-import { IconHomeFilled, IconCoinFilled, IconCreditCardFilled, IconClockFilled } from "@tabler/icons-react";
+import { useChainId } from "wagmi";
+import {
+  IconHomeFilled,
+  IconCoinFilled,
+  IconCreditCardFilled,
+  IconClockFilled,
+  IconLogout,
+} from "@tabler/icons-react";
 import { arcTestnet } from "@/lib/chains";
+import { useSession } from "@/hooks/useSession";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: IconHomeFilled },
@@ -28,7 +35,9 @@ export function AppSidebar() {
       <nav className="flex-1 px-3 py-2">
         <ul className="space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+            const isActive =
+              pathname === item.href ||
+              pathname?.startsWith(item.href + "/");
             return (
               <li key={item.href}>
                 <Link
@@ -48,29 +57,42 @@ export function AppSidebar() {
         </ul>
       </nav>
 
-      {/* Footer -- Wallet Status */}
-      <WalletStatus />
+      {/* Footer -- Account */}
+      <AccountStatus />
     </aside>
   );
 }
 
-function WalletStatus() {
-  const { address, isConnected } = useAccount();
+function AccountStatus() {
+  const { address, signOut } = useSession();
   const chainId = useChainId();
   const isCorrectNetwork = chainId === arcTestnet.id;
 
   return (
     <div className="px-6 py-4 border-t border-white/10">
-      {isConnected && address ? (
+      {address ? (
         <>
           <p className="text-sm text-white font-mono tracking-wide truncate">
             {address.slice(0, 6)}...{address.slice(-4)}
           </p>
-          <div className="flex items-center gap-1.5 mt-1.5">
-            <span className={`w-1.5 h-1.5 ${isCorrectNetwork ? "bg-[#10B981]" : "bg-[#F59E0B]"}`} />
-            <p className="text-xs text-white/70">
-              {isCorrectNetwork ? "Arc Testnet" : "Wrong Network"}
-            </p>
+          <div className="flex items-center justify-between mt-1.5">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`w-1.5 h-1.5 ${
+                  isCorrectNetwork ? "bg-[#10B981]" : "bg-[#F59E0B]"
+                }`}
+              />
+              <p className="text-xs text-white/70">
+                {isCorrectNetwork ? "Arc Testnet" : "Wrong Network"}
+              </p>
+            </div>
+            <button
+              onClick={signOut}
+              title="Sign Out"
+              className="text-white/40 hover:text-white/90 transition-colors"
+            >
+              <IconLogout size={14} />
+            </button>
           </div>
         </>
       ) : (
