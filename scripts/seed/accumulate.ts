@@ -1,12 +1,9 @@
 // chariot/scripts/seed/accumulate.ts
 // Long-running loop: every 2 hours, each lender deposits available USDC (claimed from faucet).
-// Deployer no longer refills lenders -- each wallet claims faucet.circle.com independently.
+// Each wallet claims faucet.circle.com independently -- no deployer refill needed.
 // Run: cd chariot && npx tsx scripts/seed/accumulate.ts
 // Stop: Ctrl+C (waits for in-flight txs to settle)
 
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import { formatUnits } from "viem";
 import {
   USDC, CHARIOT_VAULT, SIMPLE_ORACLE,
@@ -14,30 +11,16 @@ import {
   ERC20_ABI, VAULT_ABI, ORACLE_ABI,
   usdc,
 } from "./lib/constants.js";
-import { publicClient, deployerClient, walletClientFor } from "./lib/clients.js";
-import { getLenders, getWallet } from "./lib/wallets.js";
+import { publicClient, deployerClient } from "./lib/clients.js";
+import { getLenders } from "./lib/wallets.js";
+import { walletClientFor } from "./lib/clients.js";
 import { execTx, sleep } from "./lib/tx.js";
 import { banner, appendLog } from "./lib/logger.js";
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-const TEN_MINUTES_MS = 10 * 60 * 1000;
 
-const PENDING_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "pending.json");
-
-function loadPending(): Record<string, bigint> {
-  if (fs.existsSync(PENDING_PATH)) {
-    const raw = JSON.parse(fs.readFileSync(PENDING_PATH, "utf-8")) as Record<string, string>;
-    return { L8: BigInt(raw.L8 ?? "0"), L9: BigInt(raw.L9 ?? "0") };
-  }
-  return { L8: 0n, L9: 0n };
-}
-
-function savePending(state: Record<string, bigint>) {
-  fs.writeFileSync(PENDING_PATH, JSON.stringify({ L8: state.L8.toString(), L9: state.L9.toString() }, null, 2));
-}
-
-// L8 and L9 accumulate across 2 cycles before depositing
-const pendingAccumulation: Record<string, bigint> = loadPending();
+// Keep $0.50 USDC per wallet for gas
+const GAS_RESERVE = usdc(0.5);
 
 let running = true;
 process.on("SIGINT", () => {
@@ -45,11 +28,10 @@ process.on("SIGINT", () => {
   running = false;
 });
 
-// Gas reserve to leave in each lender wallet (covers ~10 txs at $0.05 each)
-const GAS_RESERVE = usdc(0.5);
-
-async function depositAvailable(role: string, delayed: boolean = false) {
-  const lender = getWallet(role);
+async function depositAvailable(role: string) {
+  const lenders = getLenders();
+  const lender = lenders.find((l) => l.role === role);
+  if (!lender) return;
   const client = walletClientFor(lender);
 
   const bal = await publicClient.readContract({
@@ -58,90 +40,39 @@ async function depositAvailable(role: string, delayed: boolean = false) {
   const depositable = bal > GAS_RESERVE ? bal - GAS_RESERVE : 0n;
 
   if (depositable < usdc(1)) {
-    console.log(`  ${role}: balance $${formatUnits(bal, 6)} -- too low to deposit (claim faucet.circle.com)`);
+    console.log(`  ${role}: $${formatUnits(bal, 6)} -- too low to deposit (claim faucet.circle.com)`);
     return;
   }
 
-  if (delayed) {
-    console.log(`  ${role}: waiting 10 minutes before deposit...`);
-    await sleep(TEN_MINUTES_MS);
-  }
-
-  await execTx(`${role}: approve vault $${formatUnits(depositable, 6)} USDC`, client, {
+  await execTx(`${role}: approve $${formatUnits(depositable, 6)}`, client, {
     address: USDC, abi: ERC20_ABI, functionName: "approve",
     args: [CHARIOT_VAULT, depositable],
   });
-  await execTx(`${role}: deposit $${formatUnits(depositable, 6)} USDC into vault${delayed ? " (delayed)" : ""}`, client, {
+  await execTx(`${role}: deposit $${formatUnits(depositable, 6)}`, client, {
     address: CHARIOT_VAULT, abi: VAULT_ABI, functionName: "deposit",
     args: [depositable, lender.address],
   });
-  await sleep(500);
+  await sleep(300);
 }
 
 async function runCycle(cycleNum: number) {
   banner(`Accumulation Cycle #${cycleNum} -- ${new Date().toISOString()}`);
 
-  // 1. Refresh oracle (deployer only needs gas for this -- ~$0.05)
+  // Refresh oracle
   await execTx("Refresh ETHUSD oracle", deployerClient, {
     address: SIMPLE_ORACLE, abi: ORACLE_ABI, functionName: "setPriceNow",
     args: [ETHUSD_FEED_ID, ETH_PRICE_WAD],
   });
 
-  // 2. L1-L4: deposit immediately from own balance (claimed from faucet)
-  for (const role of ["L1", "L2", "L3", "L4"]) {
-    try { await depositAvailable(role); } catch (e) { console.error(`  ${role} deposit failed: ${(e as Error).message}`); }
-  }
-
-  // 3. L5-L7: deposit with 10-minute delay
-  for (const role of ["L5", "L6", "L7"]) {
-    try { await depositAvailable(role, true); } catch (e) { console.error(`  ${role} deposit failed: ${(e as Error).message}`); }
-  }
-
-  // 4. L8-L9: accumulate across 2 cycles (deposit when balance >= 40 USDC)
-  for (const role of ["L8", "L9"]) {
-    const lender = getWallet(role);
-    const bal = await publicClient.readContract({
-      address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [lender.address],
-    });
-    pendingAccumulation[role] = bal > GAS_RESERVE ? bal - GAS_RESERVE : 0n;
-    savePending(pendingAccumulation);
-
-    const accumulated = pendingAccumulation[role];
-    if (accumulated >= usdc(38)) {
-      const client = walletClientFor(lender);
-      await execTx(`${role}: approve vault $${formatUnits(accumulated, 6)} USDC (bulk)`, client, {
-        address: USDC, abi: ERC20_ABI, functionName: "approve",
-        args: [CHARIOT_VAULT, accumulated],
-      });
-      await execTx(`${role}: deposit $${formatUnits(accumulated, 6)} USDC into vault (bulk)`, client, {
-        address: CHARIOT_VAULT, abi: VAULT_ABI, functionName: "deposit",
-        args: [accumulated, lender.address],
-      });
-      pendingAccumulation[role] = 0n;
-      savePending(pendingAccumulation);
-    } else {
-      console.log(`  ${role}: $${formatUnits(accumulated, 6)} USDC available -- holding until next cycle`);
+  // Deposit from all lenders
+  const lenders = getLenders();
+  console.log(`  Processing ${lenders.length} lenders...`);
+  for (const lender of lenders) {
+    try {
+      await depositAvailable(lender.role);
+    } catch (e) {
+      console.error(`  ${lender.role} deposit failed: ${(e as Error).message}`);
     }
-  }
-
-  // 5. L10: deposit 75% of balance, keep 25% (partial depositor persona)
-  const l10 = getWallet("L10");
-  const l10Bal = await publicClient.readContract({
-    address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [l10.address],
-  });
-  const l10Deposit = l10Bal > GAS_RESERVE ? (l10Bal - GAS_RESERVE) * 3n / 4n : 0n;
-  if (l10Deposit >= usdc(1)) {
-    const l10Client = walletClientFor(l10);
-    await execTx(`L10: approve vault $${formatUnits(l10Deposit, 6)} USDC (partial)`, l10Client, {
-      address: USDC, abi: ERC20_ABI, functionName: "approve",
-      args: [CHARIOT_VAULT, l10Deposit],
-    });
-    await execTx(`L10: deposit $${formatUnits(l10Deposit, 6)} USDC (keeps 25%)`, l10Client, {
-      address: CHARIOT_VAULT, abi: VAULT_ABI, functionName: "deposit",
-      args: [l10Deposit, l10.address],
-    });
-  } else {
-    console.log(`  L10: $${formatUnits(l10Bal, 6)} balance -- too low to deposit`);
   }
 
   // Print vault TVL
@@ -153,8 +84,9 @@ async function runCycle(cycleNum: number) {
 }
 
 async function main() {
-  console.log("Starting accumulation loop. Press Ctrl+C to stop gracefully.");
-  console.log("Target: run for 12-24 hours to reach ~$1,000-1,200 vault TVL.\n");
+  const lenders = getLenders();
+  console.log(`Starting accumulation loop with ${lenders.length} lenders. Press Ctrl+C to stop.`);
+  console.log(`With ${lenders.length} wallets @ 20 USDC each, one cycle = ~$${lenders.length * 20} TVL.\n`);
 
   let cycle = 1;
   while (running) {
