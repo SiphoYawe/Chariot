@@ -19,16 +19,12 @@ interface RawLog {
 }
 
 async function fetchLogs(address: string): Promise<RawLog[]> {
-  try {
-    const res = await fetch(
-      `${ARCSCAN_API}?module=logs&action=getLogs&address=${address}&fromBlock=0&toBlock=latest`
-    );
-    if (!res.ok) return [];
-    const json = await res.json();
-    return Array.isArray(json.result) ? json.result : [];
-  } catch {
-    return [];
-  }
+  const res = await fetch(
+    `${ARCSCAN_API}?module=logs&action=getLogs&address=${address}&fromBlock=0&toBlock=latest`
+  );
+  if (!res.ok) throw new Error(`ArcScan API returned ${res.status}`);
+  const json = await res.json();
+  return Array.isArray(json.result) ? json.result : [];
 }
 
 /**
@@ -43,13 +39,32 @@ export function useProtocolActivity() {
   const loadActivity = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [vaultLogs, poolLogs, collateralLogs] = await Promise.all([
+      const results = await Promise.allSettled([
         fetchLogs(CHARIOT_ADDRESSES.CHARIOT_VAULT),
         fetchLogs(CHARIOT_ADDRESSES.LENDING_POOL),
         fetchLogs(CHARIOT_ADDRESSES.COLLATERAL_MANAGER),
       ]);
 
-      const allLogs = [...vaultLogs, ...poolLogs, ...collateralLogs];
+      // If every request failed, surface error
+      const rejectedCount = results.filter((r) => r.status === "rejected").length;
+      if (rejectedCount === results.length) {
+        console.error(
+          "[useProtocolActivity] All ArcScan API queries failed:",
+          results.map((r) => (r.status === "rejected" ? r.reason : null))
+        );
+        setIsError(true);
+        setIsLoading(false);
+        return;
+      }
+
+      const extractValue = (result: PromiseSettledResult<RawLog[]>): RawLog[] =>
+        result.status === "fulfilled" ? result.value : [];
+
+      const allLogs = [
+        ...extractValue(results[0]),
+        ...extractValue(results[1]),
+        ...extractValue(results[2]),
+      ];
       const now = Date.now();
       const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
 
@@ -78,7 +93,8 @@ export function useProtocolActivity() {
 
       setBuckets(result);
       setIsError(false);
-    } catch {
+    } catch (err) {
+      console.error("[useProtocolActivity] Failed to load activity:", err);
       setIsError(true);
     } finally {
       setIsLoading(false);
@@ -91,5 +107,6 @@ export function useProtocolActivity() {
     return () => clearInterval(id);
   }, [loadActivity]);
 
-  return { buckets, isLoading, isError, refetch: loadActivity };
+  const refetch = useCallback(() => { loadActivity(); }, [loadActivity]);
+  return { buckets, isLoading, isError, refetch };
 }
