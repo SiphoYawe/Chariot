@@ -22,35 +22,34 @@ async function main() {
 
   const b4Debt = await publicClient.readContract({
     address: LENDING_POOL, abi: POOL_ABI, functionName: "getUserDebt", args: [b4.address],
-  });
+  }) as bigint;
   console.log(`  B4 current debt: $${formatUnits(b4Debt, 6)}`);
 
   const b4RepayAmount = usdc(60);
-  if (b4Debt < b4RepayAmount) throw new Error(`B4 debt ($${formatUnits(b4Debt, 6)}) < repay amount ($60)`);
-
-  // Top up B4 if needed -- B4's borrowed USDC may have been spent on gas
-  const b4UsdcBal = await publicClient.readContract({
-    address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [b4.address],
-  });
-  console.log(`  B4 USDC balance: $${formatUnits(b4UsdcBal, 6)}`);
-  if (b4UsdcBal < b4RepayAmount) {
-    const needed = b4RepayAmount - b4UsdcBal + usdc(1);
-    await execTx(`Fund B4 with $${formatUnits(needed, 6)} USDC for repayment`, deployerClient, {
-      address: USDC, abi: ERC20_ABI, functionName: "transfer", args: [b4.address, needed],
+  if (b4Debt >= b4RepayAmount) {
+    const b4UsdcBal = await publicClient.readContract({
+      address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [b4.address],
+    }) as bigint;
+    console.log(`  B4 USDC balance: $${formatUnits(b4UsdcBal, 6)}`);
+    if (b4UsdcBal < b4RepayAmount) {
+      const needed = b4RepayAmount - b4UsdcBal + usdc(1);
+      await execTx(`Fund B4 with $${formatUnits(needed, 6)} USDC for repayment`, deployerClient, {
+        address: USDC, abi: ERC20_ABI, functionName: "transfer", args: [b4.address, needed],
+      });
+    }
+    await execTx("B4: approve LendingPool $60 USDC", b4Client, {
+      address: USDC, abi: ERC20_ABI, functionName: "approve", args: [LENDING_POOL, b4RepayAmount],
     });
+    await execTx("B4: repay $60 USDC (partial)", b4Client, {
+      address: LENDING_POOL, abi: POOL_ABI, functionName: "repay", args: [b4RepayAmount],
+    });
+    const b4DebtAfter = await publicClient.readContract({
+      address: LENDING_POOL, abi: POOL_ABI, functionName: "getUserDebt", args: [b4.address],
+    }) as bigint;
+    console.log(`  B4 remaining debt: $${formatUnits(b4DebtAfter, 6)}`);
+  } else {
+    console.log(`  B4 already partially repaid (debt $${formatUnits(b4Debt, 6)} < $60) -- skipping`);
   }
-
-  await execTx("B4: approve LendingPool $60 USDC", b4Client, {
-    address: USDC, abi: ERC20_ABI, functionName: "approve", args: [LENDING_POOL, b4RepayAmount],
-  });
-  await execTx("B4: repay $60 USDC (partial)", b4Client, {
-    address: LENDING_POOL, abi: POOL_ABI, functionName: "repay", args: [b4RepayAmount],
-  });
-
-  const b4DebtAfter = await publicClient.readContract({
-    address: LENDING_POOL, abi: POOL_ABI, functionName: "getUserDebt", args: [b4.address],
-  });
-  console.log(`  B4 remaining debt: $${formatUnits(b4DebtAfter, 6)}`);
   await sleep(2000);
 
   // -- B5: Full Repayment + Collateral Withdrawal --
@@ -58,52 +57,56 @@ async function main() {
   const b5 = getWallet("B5");
   const b5Client = walletClientFor(b5);
 
-  const b5Debt = await publicClient.readContract({
-    address: LENDING_POOL, abi: POOL_ABI, functionName: "getUserDebt", args: [b5.address],
-  });
-  console.log(`  B5 current debt (with interest): $${formatUnits(b5Debt, 6)}`);
-
-  // Top up B5 to cover full debt + buffer for accrued interest
-  const b5UsdcBal = await publicClient.readContract({
-    address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [b5.address],
-  });
-  const b5Buffer = usdc(1);
-  if (b5UsdcBal < b5Debt + b5Buffer) {
-    const needed = b5Debt + b5Buffer - b5UsdcBal;
-    await execTx(`Fund B5 with $${formatUnits(needed, 6)} USDC for full repayment`, deployerClient, {
-      address: USDC, abi: ERC20_ABI, functionName: "transfer", args: [b5.address, needed],
-    });
-  }
-
-  // Refresh oracle before repayment/withdrawal
-  await execTx("Refresh ETHUSD oracle before B5 repayment", deployerClient, {
-    address: SIMPLE_ORACLE, abi: ORACLE_ABI, functionName: "setPriceNow",
-    args: [ETHUSD_FEED_ID, ETH_PRICE_WAD],
-  });
-
-  await execTx(`B5: approve LendingPool $${formatUnits(b5Debt + b5Buffer, 6)} USDC`, b5Client, {
-    address: USDC, abi: ERC20_ABI, functionName: "approve",
-    args: [LENDING_POOL, b5Debt + b5Buffer],
-  });
-  await execTx("B5: repay full debt", b5Client, {
-    address: LENDING_POOL, abi: POOL_ABI, functionName: "repay", args: [b5Debt],
-  });
-
-  // Withdraw all B5 collateral
   const b5Collateral = await publicClient.readContract({
     address: COLLATERAL_MANAGER, abi: COLLATERAL_ABI, functionName: "getCollateralBalance",
     args: [b5.address, BRIDGED_ETH],
-  });
-  console.log(`  B5 collateral to withdraw: ${formatUnits(b5Collateral, 18)} ETH`);
+  }) as bigint;
 
-  await execTx("B5: withdraw all BridgedETH collateral", b5Client, {
-    address: COLLATERAL_MANAGER, abi: COLLATERAL_ABI, functionName: "withdrawCollateral",
-    args: [BRIDGED_ETH, b5Collateral],
-  });
+  const b5Debt = await publicClient.readContract({
+    address: LENDING_POOL, abi: POOL_ABI, functionName: "getUserDebt", args: [b5.address],
+  }) as bigint;
+  console.log(`  B5 current debt (with interest): $${formatUnits(b5Debt, 6)}`);
+  console.log(`  B5 collateral: ${formatUnits(b5Collateral, 18)} ETH`);
+
+  if (b5Debt > 0n) {
+    const b5UsdcBal = await publicClient.readContract({
+      address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [b5.address],
+    }) as bigint;
+    const b5Buffer = usdc(1);
+    if (b5UsdcBal < b5Debt + b5Buffer) {
+      const needed = b5Debt + b5Buffer - b5UsdcBal;
+      await execTx(`Fund B5 with $${formatUnits(needed, 6)} USDC for full repayment`, deployerClient, {
+        address: USDC, abi: ERC20_ABI, functionName: "transfer", args: [b5.address, needed],
+      });
+    }
+    await execTx("Refresh ETHUSD oracle before B5 repayment", deployerClient, {
+      address: SIMPLE_ORACLE, abi: ORACLE_ABI, functionName: "setPriceNow",
+      args: [ETHUSD_FEED_ID, ETH_PRICE_WAD],
+    });
+    // Approve MAX so repayFull() can transfer exact accrued amount atomically
+    await execTx("B5: approve LendingPool MAX USDC for repayFull", b5Client, {
+      address: USDC, abi: ERC20_ABI, functionName: "approve",
+      args: [LENDING_POOL, 2n ** 256n - 1n],
+    });
+    await execTx("B5: repayFull (clears all debt + accrued interest atomically)", b5Client, {
+      address: LENDING_POOL, abi: POOL_ABI, functionName: "repayFull", args: [],
+    });
+  } else {
+    console.log("  B5 debt already 0 -- skipping repayment");
+  }
+
+  if (b5Collateral > 0n) {
+    await execTx("B5: withdraw all BridgedETH collateral", b5Client, {
+      address: COLLATERAL_MANAGER, abi: COLLATERAL_ABI, functionName: "withdrawCollateral",
+      args: [BRIDGED_ETH, b5Collateral],
+    });
+  } else {
+    console.log("  B5 collateral already withdrawn -- skipping");
+  }
 
   const b5DebtAfter = await publicClient.readContract({
     address: LENDING_POOL, abi: POOL_ABI, functionName: "getUserDebt", args: [b5.address],
-  });
+  }) as bigint;
   console.log(`  B5 final debt: $${formatUnits(b5DebtAfter, 6)} (should be 0)`);
   await sleep(2000);
 
@@ -118,11 +121,11 @@ async function main() {
     const shares = await publicClient.readContract({
       address: CHARIOT_VAULT, abi: VAULT_ABI, functionName: "balanceOf",
       args: [lender.address],
-    });
+    }) as bigint;
     const assets = await publicClient.readContract({
       address: CHARIOT_VAULT, abi: VAULT_ABI, functionName: "convertToAssets",
       args: [shares],
-    });
+    }) as bigint;
     console.log(`  ${role}: holds ${formatUnits(shares, 18)} chUSDC = $${formatUnits(assets, 6)} USDC`);
 
     const safeWithdraw = assets > withdrawAmount ? withdrawAmount : assets / 2n;

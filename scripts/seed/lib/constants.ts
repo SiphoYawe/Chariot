@@ -83,6 +83,7 @@ const STORK_VALUE_INPUT_COMPONENTS = [
 export const POOL_ABI = [
   { type: "function", name: "borrow", inputs: [{ name: "collateralToken", type: "address" }, { name: "amount", type: "uint256" }, { name: "priceUpdates", type: "tuple[]", components: STORK_VALUE_INPUT_COMPONENTS }], outputs: [], stateMutability: "nonpayable" },
   { type: "function", name: "repay", inputs: [{ name: "amount", type: "uint256" }], outputs: [], stateMutability: "nonpayable" },
+  { type: "function", name: "repayFull", inputs: [], outputs: [], stateMutability: "nonpayable" },
   { type: "function", name: "getTotalBorrowed", inputs: [], outputs: [{ name: "", type: "uint256" }], stateMutability: "view" },
   { type: "function", name: "getUserDebt", inputs: [{ name: "user", type: "address" }], outputs: [{ name: "", type: "uint256" }], stateMutability: "view" },
 ] as const;
