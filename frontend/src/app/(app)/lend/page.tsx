@@ -27,6 +27,7 @@ import { SharePriceDisplay } from "@/components/vault/SharePriceDisplay";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { YieldHistoryChart } from "@/components/charts/YieldHistoryChart";
 import { SharePriceCorridorChart } from "@/components/charts/SharePriceCorridorChart";
+import { EarningsCohortChart } from "@/components/charts/EarningsCohortChart";
 import { YieldRadialChart } from "@/components/charts/YieldRadialChart";
 import { IconLoader2, IconCoinFilled, IconWallet } from "@tabler/icons-react";
 import {
@@ -637,6 +638,7 @@ export default function LendPage() {
               <YieldHistoryChart />
               <SharePriceCorridorChart />
             </div>
+            <EarningsCohortChart />
           </div>
         </>
       )}
