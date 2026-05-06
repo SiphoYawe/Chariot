@@ -40,16 +40,17 @@ function ProjectionTooltip({ active, payload, label }: ProjectionTooltipProps) {
 }
 
 export function InterestProjectionChart({ outstandingDebt, borrowRate }: InterestProjectionChartProps) {
-  const chartData = useMemo(() => {
+  const { chartData, interest30, interest90 } = useMemo(() => {
     const dailyRate = borrowRate / 365;
-    return Array.from({ length: 91 }, (_, i) => ({
-      day: i,
-      interest: outstandingDebt * dailyRate * i,
-    }));
+    return {
+      chartData: Array.from({ length: 91 }, (_, i) => ({
+        day: i,
+        interest: outstandingDebt * dailyRate * i,
+      })),
+      interest30: outstandingDebt * dailyRate * 30,
+      interest90: outstandingDebt * dailyRate * 90,
+    };
   }, [outstandingDebt, borrowRate]);
-
-  const interest30 = outstandingDebt * (borrowRate / 365) * 30;
-  const interest90 = outstandingDebt * (borrowRate / 365) * 90;
 
   if (outstandingDebt <= 0) return null;
 
@@ -62,7 +63,6 @@ export function InterestProjectionChart({ outstandingDebt, borrowRate }: Interes
         <span className="text-xs text-[#6B8A8D]">At current rate ({(borrowRate * 100).toFixed(2)}% APR)</span>
       </div>
 
-      {/* Quick stats */}
       <div className="flex gap-4 mb-4">
         {[{ label: "30 days", value: interest30 }, { label: "90 days", value: interest90 }].map((s) => (
           <div key={s.label}>
