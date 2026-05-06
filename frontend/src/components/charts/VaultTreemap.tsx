@@ -26,7 +26,7 @@ function TreemapTooltip({ active, payload }: TreemapTooltipProps) {
   return (
     <div className="border border-[rgba(3,121,113,0.15)] bg-white p-3 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        <span className="w-2 h-2" style={{ backgroundColor: COLORS[d.name] }} />
+        <span className="w-2 h-2" style={{ backgroundColor: COLORS[d.name] ?? "#037971" }} />
         <span className="text-xs text-[#6B8A8D]">{d.name}</span>
       </div>
       <p className="text-sm font-semibold tabular-nums text-[#023436] font-[family-name:var(--font-heading)]">
@@ -49,18 +49,20 @@ interface CustomContentProps {
 
 function CustomContent({ x = 0, y = 0, width = 0, height = 0, name = "", value = 0, pct = "" }: CustomContentProps) {
   const color = COLORS[name] ?? "#037971";
-  const showLabel = width > 60 && height > 36;
+  const showLabel = width > 60 && height > 36 && value > 0 && !!name;
   return (
-    <g>
+    <g aria-label={name ? `${name}: ${formatUSDC(value)} (${pct})` : undefined}>
       <rect x={x} y={y} width={width} height={height} fill={color} stroke="#fff" strokeWidth={2} />
       {showLabel && (
         <>
           <text x={x + 8} y={y + 18} fill="white" fontSize={11} fontWeight={600}>
             {name}
           </text>
-          <text x={x + 8} y={y + 32} fill="rgba(255,255,255,0.8)" fontSize={10}>
-            {formatUSDC(value)} ({pct})
-          </text>
+          {pct && (
+            <text x={x + 8} y={y + 32} fill="rgba(255,255,255,0.8)" fontSize={10}>
+              {formatUSDC(value)} ({pct})
+            </text>
+          )}
         </>
       )}
     </g>
@@ -110,10 +112,10 @@ export function VaultTreemap() {
         <Treemap
           data={chartData}
           dataKey="value"
-          aspectRatio={4 / 3}
-          content={<CustomContent />}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          content={((props: any) => <CustomContent {...(props as CustomContentProps)} />) as any}
         >
-          <Tooltip content={<TreemapTooltip />} />
+          <Tooltip content={(props) => <TreemapTooltip {...(props as TreemapTooltipProps)} />} />
         </Treemap>
       </ResponsiveContainer>
     </div>
