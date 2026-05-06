@@ -1,5 +1,6 @@
 // chariot/scripts/seed/fund-wallets.ts
-// One-shot: deployer funds all 15 wallets with USDC and BridgedETH.
+// One-shot: mints BridgedETH to borrowers and refreshes oracle.
+// Lenders fund themselves via faucet.circle.com -- deployer does NOT send them USDC.
 // Run: cd chariot && npx tsx scripts/seed/fund-wallets.ts
 
 import { formatUnits } from "viem";
@@ -10,7 +11,7 @@ import {
   usdc, eth,
 } from "./lib/constants.js";
 import { publicClient, deployerClient, deployerAccount } from "./lib/clients.js";
-import { getLenders, getBorrowers } from "./lib/wallets.js";
+import { getBorrowers } from "./lib/wallets.js";
 import { execTx, sleep } from "./lib/tx.js";
 import { banner } from "./lib/logger.js";
 
@@ -24,61 +25,11 @@ const BORROWER_CONFIG = [
 ];
 
 async function main() {
-  banner("Fund Wallets -- Deployer Pre-funding");
+  banner("Fund Wallets -- BridgedETH + Oracle");
 
-  const lenders = getLenders();
   const borrowers = getBorrowers();
 
-  // Check deployer USDC balance
-  const deployerBal = await publicClient.readContract({
-    address: USDC, abi: ERC20_ABI, functionName: "balanceOf",
-    args: [deployerAccount.address],
-  });
-  console.log(`Deployer USDC balance: $${formatUnits(deployerBal, 6)}`);
-
-  const totalNeeded = usdc(22) * BigInt(lenders.length) + usdc(2) * BigInt(borrowers.length);
-  console.log(`Total USDC needed for gas funding: $${formatUnits(totalNeeded, 6)}`);
-  if (deployerBal < totalNeeded + usdc(5)) {
-    throw new Error(`Deployer has insufficient USDC. Need $${formatUnits(totalNeeded + usdc(5), 6)}, have $${formatUnits(deployerBal, 6)}`);
-  }
-
-  // 1. Fund lenders: 22 USDC each (20 to deposit + 2 gas)
-  banner("Funding Lender Wallets");
-  for (const lender of lenders) {
-    const bal = await publicClient.readContract({
-      address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [lender.address],
-    });
-    if (bal >= usdc(22)) {
-      console.log(`  Skipping ${lender.role} -- already has $${formatUnits(bal, 6)} USDC`);
-      continue;
-    }
-    await execTx(
-      `Transfer 22 USDC to lender ${lender.role} (${lender.address.slice(0, 8)}...)`,
-      deployerClient,
-      { address: USDC, abi: ERC20_ABI, functionName: "transfer", args: [lender.address, usdc(22)] }
-    );
-    await sleep(1000);
-  }
-
-  // 2. Fund borrowers: 2 USDC gas buffer each
-  banner("Funding Borrower Wallets (gas only)");
-  for (const borrower of borrowers) {
-    const bal = await publicClient.readContract({
-      address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [borrower.address],
-    });
-    if (bal >= usdc(2)) {
-      console.log(`  Skipping ${borrower.role} gas -- already has $${formatUnits(bal, 6)} USDC`);
-      continue;
-    }
-    await execTx(
-      `Transfer 2 USDC gas to borrower ${borrower.role} (${borrower.address.slice(0, 8)}...)`,
-      deployerClient,
-      { address: USDC, abi: ERC20_ABI, functionName: "transfer", args: [borrower.address, usdc(2)] }
-    );
-    await sleep(1000);
-  }
-
-  // 3. Mint BridgedETH to borrowers
+  // 1. Mint BridgedETH to borrowers
   banner("Minting BridgedETH to Borrower Wallets");
   for (const cfg of BORROWER_CONFIG) {
     const borrower = borrowers.find((b) => b.role === cfg.role);
@@ -98,15 +49,15 @@ async function main() {
     await sleep(1000);
   }
 
-  // 4. Refresh oracle
+  // 2. Refresh oracle
   banner("Refreshing Oracle Price");
   await execTx("Set ETHUSD oracle price to $2,500", deployerClient, {
     address: SIMPLE_ORACLE, abi: ORACLE_ABI, functionName: "setPriceNow",
     args: [ETHUSD_FEED_ID, ETH_PRICE_WAD],
   });
 
-  banner("Funding Complete");
-  console.log("Next step: run accumulate.ts to start the lender deposit loop.");
+  banner("Done");
+  console.log("Next: run accumulate.ts --once to deposit all lender USDC into the vault.");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

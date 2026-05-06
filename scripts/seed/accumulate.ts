@@ -37,20 +37,32 @@ async function depositAvailable(role: string) {
   const bal = await publicClient.readContract({
     address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [lender.address],
   });
-  const depositable = bal > GAS_RESERVE ? bal - GAS_RESERVE : 0n;
-
-  if (depositable < usdc(1)) {
+  if (bal <= GAS_RESERVE) {
     console.log(`  ${role}: $${formatUnits(bal, 6)} -- too low to deposit (claim faucet.circle.com)`);
     return;
   }
 
-  await execTx(`${role}: approve $${formatUnits(depositable, 6)}`, client, {
+  // Approve MAX so the deposit amount can be computed fresh after the approve tx consumes gas.
+  // On Arc testnet USDC is the native gas token -- gas is deducted from the USDC balance
+  // before transferFrom runs, so depositing the pre-approve balance causes "exceeds balance".
+  await execTx(`${role}: approve vault`, client, {
     address: USDC, abi: ERC20_ABI, functionName: "approve",
-    args: [CHARIOT_VAULT, depositable],
+    args: [CHARIOT_VAULT, 2n ** 256n - 1n],
   });
-  await execTx(`${role}: deposit $${formatUnits(depositable, 6)}`, client, {
+
+  // Re-read balance so we deposit exactly what's left after approve gas.
+  const balAfter = await publicClient.readContract({
+    address: USDC, abi: ERC20_ABI, functionName: "balanceOf", args: [lender.address],
+  });
+  const toDeposit = balAfter > GAS_RESERVE ? balAfter - GAS_RESERVE : 0n;
+  if (toDeposit < usdc(1)) {
+    console.log(`  ${role}: $${formatUnits(balAfter, 6)} after approve -- too low, skipping`);
+    return;
+  }
+
+  await execTx(`${role}: deposit $${formatUnits(toDeposit, 6)}`, client, {
     address: CHARIOT_VAULT, abi: VAULT_ABI, functionName: "deposit",
-    args: [depositable, lender.address],
+    args: [toDeposit, lender.address],
   });
   await sleep(300);
 }
