@@ -65,9 +65,23 @@ export const COLLATERAL_ABI = [
   { type: "function", name: "getETHPrice", inputs: [], outputs: [{ name: "", type: "uint256" }], stateMutability: "view" },
 ] as const;
 
+// TemporalNumericValueInput components must match the EXACT Stork struct for correct function selector.
+// Even though seed scripts always pass [] (empty array), the selector is computed from the full type.
+const STORK_VALUE_INPUT_COMPONENTS = [
+  { name: "temporalNumericValue", type: "tuple", components: [
+    { name: "timestampNs", type: "uint64" },
+    { name: "quantizedValue", type: "int192" },
+  ]},
+  { name: "id", type: "bytes32" },
+  { name: "publisherMerkleRoot", type: "bytes32" },
+  { name: "valueComputeAlgHash", type: "bytes32" },
+  { name: "r", type: "bytes32" },
+  { name: "s", type: "bytes32" },
+  { name: "v", type: "uint8" },
+] as const;
+
 export const POOL_ABI = [
-  // priceUpdates components is [] because deployed contracts use SimpleOracle -- seed scripts always pass [] for this param
-  { type: "function", name: "borrow", inputs: [{ name: "collateralToken", type: "address" }, { name: "amount", type: "uint256" }, { name: "priceUpdates", type: "tuple[]", components: [] }], outputs: [], stateMutability: "nonpayable" },
+  { type: "function", name: "borrow", inputs: [{ name: "collateralToken", type: "address" }, { name: "amount", type: "uint256" }, { name: "priceUpdates", type: "tuple[]", components: STORK_VALUE_INPUT_COMPONENTS }], outputs: [], stateMutability: "nonpayable" },
   { type: "function", name: "repay", inputs: [{ name: "amount", type: "uint256" }], outputs: [], stateMutability: "nonpayable" },
   { type: "function", name: "getTotalBorrowed", inputs: [], outputs: [{ name: "", type: "uint256" }], stateMutability: "view" },
   { type: "function", name: "getUserDebt", inputs: [{ name: "user", type: "address" }], outputs: [{ name: "", type: "uint256" }], stateMutability: "view" },
