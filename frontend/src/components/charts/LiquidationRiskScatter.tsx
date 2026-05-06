@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   ScatterChart,
   Scatter,
@@ -69,6 +70,21 @@ function ScatterTooltip({ active, payload }: ScatterTooltipProps) {
 export function LiquidationRiskScatter() {
   const { positions, isLoading, isError, refetch } = useBorrowerPositions();
 
+  const chartData = useMemo(
+    () =>
+      positions
+        .filter((p) => p.debtAmount > 0 || p.collateralAmount > 0)
+        .map((p) => ({
+          address: p.address,
+          ltv: p.collateralValueUSD > 0 ? (p.debtAmount / p.collateralValueUSD) * 100 : 0,
+          collateralValueUSD: p.collateralValueUSD,
+          debtAmount: p.debtAmount,
+          healthFactor: p.healthFactor,
+          z: Math.max(p.debtAmount, 100),
+        })),
+    [positions]
+  );
+
   if (isLoading) {
     return (
       <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
@@ -82,24 +98,13 @@ export function LiquidationRiskScatter() {
     return <ErrorState message="Unable to load borrower positions." onRetry={refetch} />;
   }
 
-  const activePositions = positions.filter((p) => p.debtAmount > 0 || p.collateralAmount > 0);
-
-  const chartData = activePositions.map((p) => ({
-    address: p.address,
-    ltv: p.collateralValueUSD > 0 ? (p.debtAmount / p.collateralValueUSD) * 100 : 0,
-    collateralValueUSD: p.collateralValueUSD,
-    debtAmount: p.debtAmount,
-    healthFactor: p.healthFactor,
-    z: Math.max(p.debtAmount, 100),
-  }));
-
   return (
     <div className="border border-[rgba(3,121,113,0.15)] bg-white p-6">
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-sm font-semibold text-[#023436] font-[family-name:var(--font-heading)]">
           Protocol Risk Map
         </h3>
-        <span className="text-xs text-[#6B8A8D]">{activePositions.length} active position{activePositions.length !== 1 ? "s" : ""}</span>
+        <span className="text-xs text-[#6B8A8D]">{chartData.length} active position{chartData.length !== 1 ? "s" : ""}</span>
       </div>
       <p className="text-xs text-[#6B8A8D] mb-4">X = LTV, Y = collateral value, size = debt, color = health factor</p>
 
@@ -115,7 +120,7 @@ export function LiquidationRiskScatter() {
               type="number"
               dataKey="ltv"
               name="LTV"
-              domain={[0, 100]}
+              domain={[0, (dataMax: number) => Math.max(100, Math.ceil(dataMax * 1.05))] as [number, (dataMax: number) => number]}
               tickFormatter={(v) => `${v}%`}
               tick={{ fontSize: 10, fill: "#6B8A8D" }}
               axisLine={false}
@@ -126,7 +131,7 @@ export function LiquidationRiskScatter() {
               type="number"
               dataKey="collateralValueUSD"
               name="Collateral"
-              tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+              tickFormatter={(v) => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v.toFixed(0)}`}
               tick={{ fontSize: 10, fill: "#6B8A8D" }}
               axisLine={false}
               tickLine={false}
@@ -142,10 +147,11 @@ export function LiquidationRiskScatter() {
             />
             <Scatter
               data={chartData}
-              shape={(props: { cx?: number; cy?: number; payload?: { healthFactor: number } }) => {
-                const { cx = 0, cy = 0, payload } = props;
+              shape={(props: { cx?: number; cy?: number; size?: number; payload?: { healthFactor: number } }) => {
+                const { cx = 0, cy = 0, size = 100, payload } = props;
+                const r = Math.max(4, Math.min(18, Math.sqrt(Math.max(size, 0) / 3.14159)));
                 const color = getHealthColor(payload?.healthFactor ?? Infinity);
-                return <circle cx={cx} cy={cy} r={6} fill={color} fillOpacity={0.8} stroke="#fff" strokeWidth={1.5} />;
+                return <circle cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.8} stroke="#fff" strokeWidth={1.5} />;
               }}
             />
           </ScatterChart>
