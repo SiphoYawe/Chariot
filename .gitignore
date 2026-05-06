@@ -12,6 +12,7 @@ Thumbs.db
 # BMAD folders
 _bmad/
 _bmad-output/
+scripts/seed/wallets.json
 
 # Documentation folders
 arc-docs/
