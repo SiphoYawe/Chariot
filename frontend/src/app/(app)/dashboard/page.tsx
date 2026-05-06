@@ -9,6 +9,7 @@ import { UtilisationHistoryChart } from "@/components/charts/UtilisationHistoryC
 import { UtilisationCurveChart } from "@/components/charts/UtilisationCurveChart";
 import { ProtocolKPIGrid } from "@/components/analytics/ProtocolKPIGrid";
 import { ActivityPulseHeatmap } from "@/components/charts/ActivityPulseHeatmap";
+import { APYWaterfallChart } from "@/components/charts/APYWaterfallChart";
 
 export default function DashboardPage() {
   return (
@@ -40,9 +41,10 @@ export default function DashboardPage() {
       </section>
 
       {/* Yield & Rate Section */}
-      <section className="grid grid-cols-2 gap-6 mb-8">
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <YieldDisplay />
         <BorrowRateDisplay />
+        <APYWaterfallChart />
       </section>
 
       {/* Vault Composition & Utilisation History Charts */}
