@@ -9,6 +9,7 @@ import { CollateralDepositFlow } from "@/components/bridge/CollateralDepositFlow
 import { BorrowerPositionCard } from "@/components/collateral/BorrowerPositionCard";
 import { BorrowPanel } from "@/components/borrow/BorrowPanel";
 import { RepayPanel } from "@/components/borrow/RepayPanel";
+import { LiquidationThermometer } from "@/components/borrow/LiquidationThermometer";
 import { FeeBreakdown } from "@/components/transaction/FeeBreakdown";
 import { ClosedPositionConfirmation } from "@/components/borrow/ClosedPositionConfirmation";
 import { HealthFactorGauge } from "@/components/risk/HealthFactorGauge";
@@ -291,7 +292,7 @@ export default function BorrowPage() {
             </div>
 
             {/* Right column: Position overview */}
-            <div>
+            <div className="space-y-4">
               <BorrowerPositionCard
                 collateralAmountEth={collateralEth}
                 collateralValueUsdc={collateralValue}
@@ -302,6 +303,11 @@ export default function BorrowPage() {
                 healthFactor={healthFactor}
                 liquidationPrice={liquidationPrice}
                 maxAdditionalBorrow={maxAdditionalBorrow}
+                hasDebt={!!hasDebt}
+              />
+              <LiquidationThermometer
+                currentPrice={price}
+                liquidationPrice={liquidationPrice}
                 hasDebt={!!hasDebt}
               />
             </div>
