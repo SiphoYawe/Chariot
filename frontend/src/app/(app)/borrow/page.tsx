@@ -70,8 +70,8 @@ export default function BorrowPage() {
   // Loading state
   const isLoading = isWalletReconnecting || collateral.isLoading || ethPrice.isLoading || position.isLoading;
 
-  // Error state
-  if (collateral.isError || ethPrice.isError) {
+  // Error state -- only fatal on contract read failures, not price API failures
+  if (collateral.isError) {
     return (
       <>
         <PageHeader title="Borrow" />
@@ -79,7 +79,6 @@ export default function BorrowPage() {
           message="Failed to load collateral data. Your funds are safe. Please try again."
           onRetry={() => {
             collateral.refetch();
-            ethPrice.refetch();
           }}
         />
       </>

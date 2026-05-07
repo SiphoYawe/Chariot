@@ -26,16 +26,22 @@ interface CollateralData {
 
 const WAD = BigInt(10) ** BigInt(18);
 
-/**
- * Hook for fetching a user's collateral data from CollateralManager.
- * Reads collateralManager.getCollateralBalance(user, BRIDGED_ETH), getETHPrice(),
- * and BridgedETH.balanceOf(user) for the wallet balance.
- */
 export function useCollateralData(_user?: `0x${string}`) {
   const { address: connectedAddress } = useAccount();
   const user = _user ?? connectedAddress;
 
-  const { price: ethPrice, isLoading: loadingPrice, isError: errorPrice } = useMarketEthPrice();
+  const { price: marketPrice, isLoading: loadingMarketPrice } = useMarketEthPrice();
+
+  // On-chain oracle price as fallback when CoinGecko is unavailable
+  const { data: rawOraclePrice, isLoading: loadingOraclePrice } = useReadContract({
+    address: CHARIOT_ADDRESSES.COLLATERAL_MANAGER,
+    abi: CollateralManagerABI,
+    functionName: "getETHPrice",
+    query: {
+      refetchInterval: POLLING_INTERVAL_MS,
+      staleTime: 30_000,
+    },
+  });
 
   const {
     data: rawCollateralBalance,
@@ -71,18 +77,22 @@ export function useCollateralData(_user?: `0x${string}`) {
 
   const isLoading = !user
     ? false
-    : loadingCollateral || loadingPrice || loadingWallet;
-  const isError = errorCollateral || errorPrice || errorWallet;
+    : loadingCollateral || loadingWallet || (loadingMarketPrice && loadingOraclePrice);
+
+  // Only fail on contract read errors -- price unavailability is handled gracefully
+  const isError = errorCollateral || errorWallet;
 
   const data = useMemo((): CollateralData | null => {
     if (!user) return null;
-    if (
-      rawCollateralBalance === undefined ||
-      ethPrice === null ||
-      rawWalletBalance === undefined
-    ) {
-      return null;
-    }
+    if (rawCollateralBalance === undefined || rawWalletBalance === undefined) return null;
+
+    // Prefer live market price; fall back to on-chain oracle price (WAD-scaled)
+    const ethPrice =
+      marketPrice !== null
+        ? marketPrice
+        : rawOraclePrice !== undefined
+        ? Number(rawOraclePrice as bigint) / Number(WAD)
+        : 0;
 
     const collateralBalance = rawCollateralBalance as bigint;
     const walletBalance = rawWalletBalance as bigint;
@@ -98,7 +108,7 @@ export function useCollateralData(_user?: `0x${string}`) {
       effectiveLtv: RISK_PARAMS.BRIDGED_ETH.BASE_LTV,
       hasCollateral,
     };
-  }, [user, rawCollateralBalance, ethPrice, rawWalletBalance]);
+  }, [user, rawCollateralBalance, rawWalletBalance, marketPrice, rawOraclePrice]);
 
   const refetch = useCallback(() => {
     refetchCollateral();
