@@ -48,7 +48,20 @@ export function FooterSection() {
           <p className="text-sm text-white/50">
             &copy; 2026 Chariot. All rights reserved.
           </p>
-          <p className="text-sm text-white/50">Built on Arc.</p>
+          <div className="flex items-center gap-4 text-sm text-white/50">
+            <span>Built on Arc.</span>
+            <span>
+              Built by{" "}
+              <a
+                href="https://siphoyawe.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white/70 hover:text-white underline transition-colors"
+              >
+                Sipho Yawe
+              </a>
+            </span>
+          </div>
         </div>
       </div>
     </footer>
